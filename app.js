@@ -5,6 +5,12 @@ const DEVELOPMENT_PIN_HASH =
   "763f0a51a8e57db6ca611f045f3c5acc85075b79cedebf010f0d2277fb966c3e";
 const AUTH_STORAGE_KEY = "servora-web-session";
 const LAST_RESTAURANT_KEY = "servora-web-restaurant";
+const SHARED_SESSION_COOKIE = "haviko_web_session";
+const SHARED_RESTAURANT_COOKIE = "haviko_web_restaurant";
+const LOGIN_URL = "https://login.haviko.de/";
+const DASHBOARD_URL = "https://dashboard.haviko.de/";
+const IS_LOGIN_HOST = window.location.hostname === "login.haviko.de";
+const IS_DASHBOARD_HOST = window.location.hostname === "dashboard.haviko.de";
 const SWIFT_REFERENCE_SECONDS = 978307200;
 const INITIAL_AUTH_MODE =
   new URLSearchParams(window.location.search).get("mode") === "register"
@@ -236,6 +242,46 @@ async function rpc(name, parameters = {}) {
 function saveSession(session) {
   app.session = session;
   localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(session));
+  const sharedSession = {
+    access_token: session?.access_token,
+    refresh_token: session?.refresh_token,
+    expires_at: session?.expires_at,
+    expires_in: session?.expires_in,
+    token_type: session?.token_type
+  };
+  document.cookie =
+    `${SHARED_SESSION_COOKIE}=${encodeURIComponent(JSON.stringify(sharedSession))}; ` +
+    "Max-Age=2592000; Path=/; Domain=.haviko.de; Secure; SameSite=Lax";
+}
+
+function readCookie(name) {
+  const prefix = `${name}=`;
+  const item = document.cookie
+    .split(";")
+    .map((value) => value.trim())
+    .find((value) => value.startsWith(prefix));
+  return item ? decodeURIComponent(item.slice(prefix.length)) : null;
+}
+
+function readStoredSession() {
+  try {
+    const local = JSON.parse(localStorage.getItem(AUTH_STORAGE_KEY) || "null");
+    if (local?.access_token || local?.refresh_token) return local;
+    return JSON.parse(readCookie(SHARED_SESSION_COOKIE) || "null");
+  } catch {
+    return null;
+  }
+}
+
+function saveLastRestaurant(restaurantID) {
+  localStorage.setItem(LAST_RESTAURANT_KEY, restaurantID);
+  document.cookie =
+    `${SHARED_RESTAURANT_COOKIE}=${encodeURIComponent(restaurantID)}; ` +
+    "Max-Age=2592000; Path=/; Domain=.haviko.de; Secure; SameSite=Lax";
+}
+
+function readLastRestaurant() {
+  return localStorage.getItem(LAST_RESTAURANT_KEY) || readCookie(SHARED_RESTAURANT_COOKIE);
 }
 
 function clearSession() {
@@ -244,6 +290,10 @@ function clearSession() {
   app.data = null;
   localStorage.removeItem(AUTH_STORAGE_KEY);
   localStorage.removeItem(LAST_RESTAURANT_KEY);
+  document.cookie =
+    `${SHARED_SESSION_COOKIE}=; Max-Age=0; Path=/; Domain=.haviko.de; Secure; SameSite=Lax`;
+  document.cookie =
+    `${SHARED_RESTAURANT_COOKIE}=; Max-Age=0; Path=/; Domain=.haviko.de; Secure; SameSite=Lax`;
 }
 
 async function createAnonymousSession() {
@@ -282,11 +332,7 @@ async function refreshSession(refreshToken) {
 
 async function ensureSession() {
   if (!app.session) {
-    try {
-      app.session = JSON.parse(localStorage.getItem(AUTH_STORAGE_KEY) || "null");
-    } catch {
-      clearSession();
-    }
+    app.session = readStoredSession();
   }
   if (
     app.session?.access_token &&
@@ -553,7 +599,11 @@ async function loadWorkspace(restaurantID = null) {
   app.workspace = result;
   app.data = normalizeState(result.state);
   app.updatedAt = result.updatedAt;
-  localStorage.setItem(LAST_RESTAURANT_KEY, result.restaurantId);
+  saveLastRestaurant(result.restaurantId);
+  if (IS_LOGIN_HOST) {
+    window.location.replace(DASHBOARD_URL);
+    return;
+  }
   showWorkspace();
   setSyncState("ready", "Aktuell");
 }
@@ -633,12 +683,16 @@ function toast(title, message, type = "success") {
 
 function showAuth() {
   document.title = "Anmelden | Haviko";
+  document.body.classList.remove("is-booting");
+  $("boot-shell")?.classList.add("hidden");
   $("auth-shell").classList.remove("hidden");
   $("app-shell").classList.add("hidden");
 }
 
 function showWorkspace() {
   document.title = "Dashboard | Haviko";
+  document.body.classList.remove("is-booting");
+  $("boot-shell")?.classList.add("hidden");
   $("auth-shell").classList.add("hidden");
   $("app-shell").classList.remove("hidden");
   $("restaurant-name").textContent = app.data.restaurantName;
@@ -2753,7 +2807,7 @@ async function logout() {
     }
   } finally {
     clearSession();
-    showAuth();
+    window.location.replace(LOGIN_URL);
   }
 }
 
@@ -2788,17 +2842,21 @@ function updateOnlineStatus() {
 }
 
 async function start() {
-  showAuth();
   switchAuth(INITIAL_AUTH_MODE);
   try {
-    const stored = JSON.parse(localStorage.getItem(AUTH_STORAGE_KEY) || "null");
-    if (!stored?.access_token && !stored?.refresh_token) return;
+    const stored = readStoredSession();
+    if (!stored?.access_token && !stored?.refresh_token) {
+      if (IS_DASHBOARD_HOST) window.location.replace(LOGIN_URL);
+      else showAuth();
+      return;
+    }
     app.session = stored;
     await ensureSession();
-    await loadWorkspace(localStorage.getItem(LAST_RESTAURANT_KEY));
+    await loadWorkspace(readLastRestaurant());
   } catch {
     clearSession();
-    showAuth();
+    if (IS_DASHBOARD_HOST) window.location.replace(LOGIN_URL);
+    else showAuth();
   }
 }
 
@@ -2834,7 +2892,14 @@ window.addEventListener("online", updateOnlineStatus);
 window.addEventListener("offline", updateOnlineStatus);
 
 updateOnlineStatus();
-if (!DEVELOPMENT_MODE) {
+if (
+  !DEVELOPMENT_MODE ||
+  readCookie("haviko_preview_access") === "granted"
+) {
   $("development-gate").classList.add("hidden");
   start();
+} else {
+  window.location.replace(
+    `https://autorisieren.haviko.de/?next=${encodeURIComponent(window.location.href)}`
+  );
 }

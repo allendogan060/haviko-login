@@ -6,23 +6,44 @@
   <meta name="theme-color" content="#0d4a3c">
   <meta name="application-name" content="Haviko">
   <meta name="apple-mobile-web-app-title" content="Haviko">
+  <meta name="apple-itunes-app" content="app-id=6794772408, app-argument=https://login.haviko.de/">
   <meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
   <title>Anmelden | Haviko</title>
   <meta name="theme-color" content="#00866a">
-  <link rel="icon" type="image/png" sizes="32x32" href="./assets/favicon-32.png?v=7">
-  <link rel="icon" type="image/png" sizes="48x48" href="./assets/favicon-48.png?v=7">
-  <link rel="icon" type="image/png" sizes="192x192" href="./assets/haviko-icon-192.png?v=7">
-  <link rel="shortcut icon" type="image/png" href="./assets/favicon-48.png?v=7">
-  <link rel="apple-touch-icon" sizes="180x180" href="./assets/apple-touch-icon.png?v=7">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32.png?v=8">
+  <link rel="icon" type="image/png" sizes="48x48" href="/assets/favicon-48.png?v=8">
+  <link rel="icon" type="image/png" sizes="192x192" href="/assets/haviko-icon-192.png?v=8">
+  <link rel="shortcut icon" type="image/png" href="/assets/favicon-48.png?v=8">
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png?v=8">
   <link rel="manifest" href="./site.webmanifest?v=7">
   <link rel="stylesheet" href="./styles.css?v=6">
+  <script>
+    (() => {
+      const hasAccess = document.cookie
+        .split(";")
+        .map((value) => value.trim())
+        .some((value) => value === "haviko_preview_access=granted");
+      if (!hasAccess && window.location.hostname !== "localhost") {
+        window.location.replace(
+          `https://autorisieren.haviko.de/?next=${encodeURIComponent(window.location.href)}`
+        );
+      }
+    })();
+  </script>
 </head>
-<body>
+<body class="is-booting">
   <div class="offline-banner hidden" id="offline-banner" role="status">
     Offline – Änderungen sind erst wieder online möglich.
   </div>
 
-  <section class="development-gate" id="development-gate" aria-label="Entwicklungsvorschau">
+  <section class="boot-shell" id="boot-shell" aria-live="polite">
+    <img class="boot-mark" src="/assets/haviko-app-icon.png" alt="">
+    <strong>Haviko</strong>
+    <span>Zugang wird geprüft</span>
+    <i aria-hidden="true"></i>
+  </section>
+
+  <section class="development-gate hidden" id="development-gate" aria-label="Entwicklungsvorschau">
     <div class="gate-brand"><img class="brand-mark" src="./assets/haviko-app-icon.png" alt=""><strong>Haviko</strong></div>
     <p class="eyebrow">Nicht öffentlich</p>
     <h1>Entwicklungsvorschau</h1>
