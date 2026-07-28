@@ -116,15 +116,6 @@
       </form>
 
       <form class="hidden" id="register-form" novalidate>
-        <nav class="stepbar" aria-label="Einrichtung Fortschritt">
-          <ol>
-            <li class="step-indicator" data-step-indicator="1" aria-current="step"><span class="step-number">1</span><span>Restaurant</span></li>
-            <li class="step-indicator" data-step-indicator="2"><span class="step-number">2</span><span>Zugang</span></li>
-            <li class="step-indicator" data-step-indicator="3"><span class="step-number">3</span><span>Kontakt</span></li>
-            <li class="step-indicator" data-step-indicator="4"><span class="step-number">4</span><span>Abschluss</span></li>
-          </ol>
-        </nav>
-
         <section class="register-step" data-register-step="1">
           <div class="step-heading">
             <h2>Restaurant</h2>
@@ -234,12 +225,17 @@
             <p>Bitte prüfe deine Angaben und stimme zum Abschluss zu.</p>
           </div>
           <div class="review-block" id="register-review"></div>
+          <div class="legal-links">
+            <button class="secondary" type="button" id="read-terms-link" data-legal-doc="terms_of_use">Nutzungsbedingungen lesen</button>
+            <button class="secondary" type="button" id="read-privacy-link" data-legal-doc="privacy_policy">Datenschutzerklärung lesen</button>
+          </div>
+          <p class="field-hint" id="legal-read-hint">Bitte öffne zuerst beide Dokumente, um zustimmen zu können.</p>
           <label class="check">
-            <input id="register-terms" type="checkbox" required>
+            <input id="register-terms" type="checkbox" required disabled>
             <span>Ich bestätige, dass ich den Betrieb anlegen darf und akzeptiere die Nutzungsbedingungen.</span>
           </label>
           <label class="check">
-            <input id="register-privacy" type="checkbox" required>
+            <input id="register-privacy" type="checkbox" required disabled>
             <span>Ich akzeptiere die Datenschutzerklärung und die Verarbeitung für Konto, Cloud-Synchronisierung und Sicherheits-E-Mails.</span>
           </label>
           <p class="form-error hidden" id="register-error" role="alert"></p>

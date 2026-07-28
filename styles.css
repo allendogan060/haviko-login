@@ -704,6 +704,10 @@ input:focus, select:focus, textarea:focus { border-color: var(--action); box-sha
 .step-actions .primary { min-width: 145px; }
 .step-actions.end-only { justify-content: flex-end; }
 
+.legal-links { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 4px; }
+.legal-links .secondary.is-read { border-color: var(--action); background: var(--action-soft); color: var(--action); }
+.legal-links .secondary.is-read::after { margin-left: 6px; content: "✓"; }
+
 .verify-shell {
   position: fixed;
   inset: 0;

@@ -31,7 +31,8 @@ const app = {
   reviews: [],
   loading: false,
   isLoggingOut: false,
-  pendingVerification: null
+  pendingVerification: null,
+  legalBundle: null
 };
 
 const roleTitles = {
@@ -645,7 +646,7 @@ async function fetchLegalBundle() {
   try {
     return await rpc("get_current_legal_bundle");
   } catch {
-    return { termsVersion: 1, privacyVersion: 1 };
+    return { terms_version: 1, privacy_version: 1 };
   }
 }
 
@@ -2936,8 +2937,8 @@ async function register(event) {
       p_owner_username: $("register-username").value.trim(),
       p_owner_password: $("register-password").value,
       p_owner_display_name: $("register-username").value.trim(),
-      p_terms_version: legalBundle.termsVersion || 1,
-      p_privacy_version: legalBundle.privacyVersion || 1
+      p_terms_version: legalBundle.terms_version || 1,
+      p_privacy_version: legalBundle.privacy_version || 1
     });
     const session = Array.isArray(rows) ? rows[0] : rows;
     if (!session?.restaurant_id) throw new Error("Restaurant konnte nicht erstellt werden.");
@@ -2987,6 +2988,34 @@ function validateRegisterStep(step, showErrors = false) {
   return valid;
 }
 
+async function loadLegalBundleForReview() {
+  app.legalBundle = await fetchLegalBundle();
+}
+
+function updateLegalReadHint() {
+  const bothRead = !$("register-terms").disabled && !$("register-privacy").disabled;
+  $("legal-read-hint").classList.toggle("hidden", bothRead);
+}
+
+function openLegalDocument(documentType) {
+  const isTerms = documentType === "terms_of_use";
+  const link = $(isTerms ? "read-terms-link" : "read-privacy-link");
+  const checkbox = $(isTerms ? "register-terms" : "register-privacy");
+  const doc = app.legalBundle?.documents?.find((item) => item.document_type === documentType);
+  if (doc) {
+    openModal({
+      title: doc.title,
+      body: (doc.sections || [])
+        .map((section) => `<h3>${escapeHTML(section.title)}</h3><p>${escapeHTML(section.body)}</p>`)
+        .join(""),
+      footer: `<button class="primary" type="button" data-modal-action="close">Schließen</button>`
+    });
+  }
+  link.classList.add("is-read");
+  checkbox.disabled = false;
+  updateLegalReadHint();
+}
+
 function renderRegisterReview() {
   const setup = registrationSetup();
   $("register-review").innerHTML = `
@@ -3008,23 +3037,21 @@ function goToRegisterStep(nextStep) {
   for (const section of document.querySelectorAll("[data-register-step]")) {
     section.classList.toggle("hidden", section.dataset.registerStep !== String(nextStep));
   }
-  document.querySelector(".stepbar")?.classList.toggle("hidden", nextStep === "done");
-  for (const indicator of document.querySelectorAll("#register-form [data-step-indicator]")) {
-    const indicatorStep = Number(indicator.dataset.stepIndicator);
-    indicator.classList.toggle("is-complete", indicatorStep < Number(nextStep));
-    if (indicatorStep === Number(nextStep)) {
-      indicator.setAttribute("aria-current", "step");
-    } else {
-      indicator.removeAttribute("aria-current");
-    }
+  if (nextStep === 4) {
+    renderRegisterReview();
+    if (!app.legalBundle) loadLegalBundleForReview();
   }
-  if (nextStep === 4) renderRegisterReview();
   $("register-form").scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function resetRegisterWizard() {
-  document.querySelector(".stepbar")?.classList.remove("hidden");
   $("register-form").reset();
+  app.legalBundle = null;
+  $("register-terms").disabled = true;
+  $("register-privacy").disabled = true;
+  $("read-terms-link").classList.remove("is-read");
+  $("read-privacy-link").classList.remove("is-read");
+  updateLegalReadHint();
   goToRegisterStep(1);
 }
 
@@ -3130,6 +3157,8 @@ $("register-form").addEventListener("keydown", (event) => {
     goToRegisterStep(Number(nextButton.dataset.nextStep));
   }
 });
+$("read-terms-link").addEventListener("click", () => openLegalDocument("terms_of_use"));
+$("read-privacy-link").addEventListener("click", () => openLegalDocument("privacy_policy"));
 $("verify-refresh-button").addEventListener("click", checkEmailVerification);
 $("verify-resend-button").addEventListener("click", resendEmailVerification);
 $("verify-logout-button").addEventListener("click", () => {
