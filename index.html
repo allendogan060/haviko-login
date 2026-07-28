@@ -58,6 +58,18 @@
     </form>
   </section>
 
+  <section class="verify-shell hidden" id="verify-shell" aria-label="E-Mail bestätigen" aria-live="polite">
+    <img class="empty-mark" src="./assets/haviko-app-icon.png" alt="">
+    <h1>E-Mail bestätigen</h1>
+    <p id="verify-message">Wir haben einen Bestätigungslink an <strong id="verify-email">–</strong> gesendet. Bitte bestätige die Adresse, um fortzufahren.</p>
+    <p class="form-error hidden" id="verify-error" role="alert"></p>
+    <div class="verify-actions">
+      <button class="primary full" id="verify-refresh-button" type="button">Ich habe bestätigt – weiter</button>
+      <button class="secondary full" id="verify-resend-button" type="button">Link erneut senden</button>
+      <button class="quiet full" id="verify-logout-button" type="button">Abmelden</button>
+    </div>
+  </section>
+
   <main class="auth-shell hidden" id="auth-shell">
     <section class="auth-brand">
       <div class="brand-lockup"><img class="brand-mark large" src="./assets/haviko-app-icon.png" alt=""><span>Haviko</span></div>
@@ -103,40 +115,149 @@
         <button class="primary full" id="login-submit" type="submit">Anmelden</button>
       </form>
 
-      <form class="hidden" id="register-form">
-        <div class="field-grid">
+      <form class="hidden" id="register-form" novalidate>
+        <nav class="stepbar" aria-label="Einrichtung Fortschritt">
+          <ol>
+            <li class="step-indicator" data-step-indicator="1" aria-current="step"><span class="step-number">1</span><span>Restaurant</span></li>
+            <li class="step-indicator" data-step-indicator="2"><span class="step-number">2</span><span>Zugang</span></li>
+            <li class="step-indicator" data-step-indicator="3"><span class="step-number">3</span><span>Kontakt</span></li>
+            <li class="step-indicator" data-step-indicator="4"><span class="step-number">4</span><span>Abschluss</span></li>
+          </ol>
+        </nav>
+
+        <section class="register-step" data-register-step="1">
+          <div class="step-heading">
+            <h2>Restaurant</h2>
+            <p>Wie heißt dein Betrieb und was für einer ist es?</p>
+          </div>
+          <div class="field-grid">
+            <label class="field">
+              <span>Restaurantname</span>
+              <input id="register-name" autocomplete="organization" required>
+            </label>
+            <label class="field">
+              <span>Art des Restaurants</span>
+              <select id="register-type">
+                <option>Restaurant</option>
+                <option>Café</option>
+                <option>Bar</option>
+                <option>Eisdiele</option>
+                <option>Foodtruck</option>
+                <option>Hotelrestaurant</option>
+                <option>Eventgastronomie</option>
+              </select>
+            </label>
+          </div>
+          <p class="form-error hidden" id="register-step1-error" role="alert"></p>
+          <div class="step-actions end-only">
+            <button class="primary" type="button" data-next-step="2">Weiter</button>
+          </div>
+        </section>
+
+        <section class="register-step hidden" data-register-step="2">
+          <div class="step-heading">
+            <h2>Zugang</h2>
+            <p>Name und Passwort der Restaurantleitung für die Anmeldung.</p>
+          </div>
           <label class="field">
-            <span>Restaurantname</span>
-            <input id="register-name" autocomplete="organization" required>
+            <span>Name der Restaurantleitung</span>
+            <input id="register-username" autocomplete="username" minlength="2" required>
+          </label>
+          <p class="field-hint">Dieser vollständige Name ist zugleich der eindeutige Anmeldename. Groß- und Kleinschreibung werden nicht unterschieden.</p>
+          <label class="field">
+            <span>Passwort</span>
+            <input id="register-password" type="password" autocomplete="new-password" minlength="8" required>
+          </label>
+          <p class="form-error hidden" id="register-step2-error" role="alert"></p>
+          <div class="step-actions">
+            <button class="quiet" type="button" data-previous-step="1">Zurück</button>
+            <button class="primary" type="button" data-next-step="3">Weiter</button>
+          </div>
+        </section>
+
+        <section class="register-step hidden" data-register-step="3">
+          <div class="step-heading">
+            <h2>Kontakt &amp; Betrieb</h2>
+            <p>Für die E-Mail-Bestätigung, den Support und die Grundeinrichtung.</p>
+          </div>
+          <label class="field">
+            <span>Recovery-E-Mail</span>
+            <input id="register-email" type="email" autocomplete="email" required>
+          </label>
+          <p class="field-hint">Diese Adresse muss vor Abschluss der Einrichtung per Link bestätigt werden und schützt die Passwort-Wiederherstellung.</p>
+          <div class="field-grid">
+            <label class="field">
+              <span>Telefon</span>
+              <input id="register-phone" type="tel" autocomplete="tel">
+            </label>
+            <label class="field">
+              <span>Website</span>
+              <input id="register-website" type="url" autocomplete="url" placeholder="https://">
+            </label>
+          </div>
+          <label class="field">
+            <span>Adresse</span>
+            <input id="register-address" autocomplete="street-address">
           </label>
           <label class="field">
-            <span>Art des Restaurants</span>
-            <select id="register-type">
-              <option>Restaurant</option>
-              <option>Café</option>
-              <option>Bar</option>
-              <option>Eisdiele</option>
-              <option>Foodtruck</option>
-              <option>Hotelrestaurant</option>
-              <option>Eventgastronomie</option>
-            </select>
+            <span>Bereiche</span>
+            <input id="register-areas" value="Innenbereich, Terrasse">
           </label>
-        </div>
-        <label class="field">
-          <span>Name der Restaurantleitung</span>
-          <input id="register-username" autocomplete="username" minlength="2" required>
-        </label>
-        <p class="field-hint">Dieser vollständige Name ist zugleich der eindeutige Anmeldename. Groß- und Kleinschreibung werden nicht unterschieden.</p>
-        <label class="field">
-          <span>Passwort</span>
-          <input id="register-password" type="password" autocomplete="new-password" minlength="8" required>
-        </label>
-        <label class="check">
-          <input id="register-terms" type="checkbox" required>
-          <span>Ich bestätige, dass ich den Betrieb anlegen darf und akzeptiere die Testbedingungen.</span>
-        </label>
-        <p class="form-error hidden" id="register-error" role="alert"></p>
-        <button class="primary full" id="register-submit" type="submit">Restaurant sicher erstellen</button>
+          <div class="field-grid">
+            <label class="field">
+              <span>Bestellmodus</span>
+              <select id="register-routing">
+                <option value="digitalKitchen">Digitale Stationen</option>
+                <option value="printedKitchen">Bondruck</option>
+                <option value="hybrid">Kombiniert</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Standard-Reservierung</span>
+              <select id="register-reservation-duration">
+                <option value="60">60 Minuten</option>
+                <option value="90" selected>90 Minuten</option>
+                <option value="120">120 Minuten</option>
+              </select>
+            </label>
+          </div>
+          <p class="form-error hidden" id="register-step3-error" role="alert"></p>
+          <div class="step-actions">
+            <button class="quiet" type="button" data-previous-step="2">Zurück</button>
+            <button class="primary" type="button" data-next-step="4">Weiter</button>
+          </div>
+        </section>
+
+        <section class="register-step hidden" data-register-step="4">
+          <div class="step-heading">
+            <h2>Übersicht &amp; Zustimmung</h2>
+            <p>Bitte prüfe deine Angaben und stimme zum Abschluss zu.</p>
+          </div>
+          <div class="review-block" id="register-review"></div>
+          <label class="check">
+            <input id="register-terms" type="checkbox" required>
+            <span>Ich bestätige, dass ich den Betrieb anlegen darf und akzeptiere die Nutzungsbedingungen.</span>
+          </label>
+          <label class="check">
+            <input id="register-privacy" type="checkbox" required>
+            <span>Ich akzeptiere die Datenschutzerklärung und die Verarbeitung für Konto, Cloud-Synchronisierung und Sicherheits-E-Mails.</span>
+          </label>
+          <p class="form-error hidden" id="register-error" role="alert"></p>
+          <div class="step-actions">
+            <button class="quiet" type="button" data-previous-step="3">Zurück</button>
+            <button class="primary" id="register-submit" type="submit">Einrichtung abschließen</button>
+          </div>
+        </section>
+
+        <section class="register-step hidden" data-register-step="done">
+          <div class="empty-state">
+            <img class="empty-mark" src="./assets/haviko-app-icon.png" alt="">
+            <h2 id="register-done-name">–</h2>
+            <p>Deine Restaurantkennung lautet:</p>
+            <div class="code-card"><strong id="register-done-code">–</strong></div>
+            <p>Bitte bestätige jetzt deine E-Mail-Adresse, um die Einrichtung abzuschließen.</p>
+          </div>
+        </section>
       </form>
     </section>
   </main>
@@ -200,6 +321,6 @@
     </div>
   </template>
 
-  <script type="module" src="./app.js?v=6"></script>
+  <script type="module" src="./app.js?v=8"></script>
 </body>
 </html>

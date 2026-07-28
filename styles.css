@@ -658,6 +658,74 @@ input:focus, select:focus, textarea:focus { border-color: var(--action); box-sha
 .empty-mark { width: 48px; height: 48px; border-radius: 10px; object-fit: cover; }
 .empty-state h2 { margin: 14px 0 5px; font-size: 19px; }
 .empty-state p { max-width: 430px; margin: 0; color: var(--muted); line-height: 1.5; }
+.code-card {
+  width: 100%;
+  max-width: 260px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-muted);
+  font-size: 1.35rem;
+  letter-spacing: 0;
+}
+
+.stepbar { margin-bottom: 26px; }
+.stepbar ol { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; list-style: none; margin: 0; padding: 0; }
+.step-indicator {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  padding-bottom: 10px;
+  border-bottom: 3px solid var(--line);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 750;
+  text-align: center;
+}
+.step-indicator[aria-current="step"] { border-bottom-color: var(--action); color: var(--forest-deep); }
+.step-indicator.is-complete { border-bottom-color: var(--action); }
+.step-number {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: white;
+  font-size: 11px;
+}
+.step-indicator[aria-current="step"] .step-number { border-color: var(--action); background: var(--action); color: white; }
+.step-indicator.is-complete .step-number { border-color: var(--action); background: var(--action-soft); color: var(--action); }
+
+.step-heading { margin-bottom: 18px; }
+.step-heading h2 { margin: 0; font-size: 21px; }
+.step-heading p { margin: 6px 0 0; color: var(--muted); line-height: 1.45; }
+.step-actions { display: flex; justify-content: space-between; gap: 10px; margin-top: 22px; }
+.step-actions .primary { min-width: 145px; }
+.step-actions.end-only { justify-content: flex-end; }
+
+.verify-shell {
+  position: fixed;
+  inset: 0;
+  z-index: 95;
+  display: grid;
+  width: min(100% - 32px, 440px);
+  height: max-content;
+  margin: auto;
+  padding: 30px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: 0 0 0 100vmax rgba(8, 55, 45, 0.55);
+}
+.verify-shell .empty-mark { margin: 0 auto 14px; }
+.verify-shell h1 { margin: 0 0 8px; font-size: 24px; text-align: center; }
+.verify-shell p { margin: 0 0 6px; color: var(--muted); line-height: 1.5; text-align: center; }
+.verify-actions { display: grid; gap: 10px; margin-top: 20px; }
+
+@media (max-width: 760px) {
+  .step-indicator span:last-child { display: none; }
+}
 
 dialog { width: min(100% - 28px, 650px); max-height: min(90vh, 820px); border: 0; border-radius: var(--radius); padding: 0; box-shadow: 0 30px 90px rgba(8,55,45,0.26); }
 dialog::backdrop { background: rgba(7,28,23,0.52); backdrop-filter: blur(3px); }

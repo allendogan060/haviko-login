@@ -29,7 +29,9 @@ const app = {
   orderCart: [],
   orderTableID: null,
   reviews: [],
-  loading: false
+  loading: false,
+  isLoggingOut: false,
+  pendingVerification: null
 };
 
 const roleTitles = {
@@ -581,8 +583,8 @@ function normalizeState(state = {}) {
   };
 }
 
-async function initializeRestaurantState(session) {
-  const initial = defaultState(session);
+async function initializeRestaurantState(session, setup = {}) {
+  const initial = applyRegistrationSetup(defaultState(session), setup);
   const result = await rpc("web_initialize_restaurant_state", {
     p_restaurant_id: session.restaurant_id,
     p_state: initial
@@ -590,11 +592,153 @@ async function initializeRestaurantState(session) {
   return result;
 }
 
+function registrationSetup() {
+  const areas = $("register-areas").value
+    .split(",")
+    .map((area) => area.trim())
+    .filter(Boolean);
+  const routing = $("register-routing").value;
+  const reservationDuration = Number($("register-reservation-duration").value || 90);
+  return {
+    email: $("register-email").value.trim().toLowerCase(),
+    phone: $("register-phone").value.trim(),
+    website: $("register-website").value.trim(),
+    address: $("register-address").value.trim(),
+    areas: areas.length ? areas : ["Innenbereich"],
+    routing,
+    reservationDuration
+  };
+}
+
+function applyRegistrationSetup(state, setup) {
+  const areas = setup.areas || ["Innenbereich"];
+  const booking = state.onlineBookingConfiguration || defaultOnlineBookingConfiguration();
+  booking.restaurant.restaurantType = $("register-type").value;
+  booking.restaurant.address = setup.address || "";
+  booking.restaurant.phone = setup.phone || "";
+  booking.restaurant.email = setup.email || "";
+  booking.restaurant.website = setup.website || "";
+  booking.restaurant.settings.allowedAreas = areas;
+  booking.restaurant.settings.standardDurationMinutes = setup.reservationDuration || 90;
+  return {
+    ...state,
+    areas,
+    kitchenOperatingMode: setup.routing || "digitalKitchen",
+    stations: [
+      {
+        id: uuid(),
+        name: "Küche",
+        icon: "flame",
+        defaultMode: setup.routing === "printedKitchen" ? "print" : "digital",
+        accessUsername: null,
+        colorName: "orange",
+        isActive: true,
+        warningMinutes: 12,
+        printerID: null
+      }
+    ],
+    onlineBookingConfiguration: booking
+  };
+}
+
+async function fetchLegalBundle() {
+  try {
+    return await rpc("get_current_legal_bundle");
+  } catch {
+    return { termsVersion: 1, privacyVersion: 1 };
+  }
+}
+
+async function requestOwnerEmailVerification(email) {
+  const response = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+    method: "PUT",
+    headers: authHeaders(),
+    body: JSON.stringify({ email })
+  });
+  return parseResponse(response);
+}
+
+function showRegistrationSuccess(session) {
+  saveLastRestaurant(session.restaurant_id);
+  document.title = "Einrichtung abgeschlossen | Haviko";
+  $("auth-title").textContent = "Einrichtung abgeschlossen";
+  $("auth-subtitle").textContent = "Speichere deine Restaurantkennung.";
+  $("register-done-name").textContent = session.restaurant_name;
+  $("register-done-code").textContent = session.restaurant_code;
+  goToRegisterStep("done");
+}
+
+function showEmailVerificationGate({ restaurantID, email, sendFailed = false }) {
+  app.pendingVerification = { restaurantID, email };
+  $("verify-email").textContent = email || "–";
+  $("verify-error").classList.add("hidden");
+  $("verify-message").textContent = sendFailed
+    ? "Die Bestätigungs-E-Mail konnte gerade nicht gesendet werden. Bitte versuche es erneut."
+    : `Wir haben einen Bestätigungslink an ${email || "deine Recovery-E-Mail"} gesendet. Bitte bestätige die Adresse, um fortzufahren.`;
+  $("verify-shell").classList.remove("hidden");
+}
+
+function hideEmailVerificationGate() {
+  $("verify-shell").classList.add("hidden");
+}
+
+async function checkEmailVerification() {
+  const pending = app.pendingVerification;
+  if (!pending?.restaurantID) return;
+  const button = $("verify-refresh-button");
+  const error = $("verify-error");
+  error.classList.add("hidden");
+  button.disabled = true;
+  button.textContent = "Wird geprüft …";
+  try {
+    const rows = await rpc("sync_primary_owner_auth_email", {
+      p_restaurant_id: pending.restaurantID
+    });
+    const row = Array.isArray(rows) ? rows[0] : rows;
+    if (row?.is_verified) {
+      hideEmailVerificationGate();
+      app.pendingVerification = null;
+      await loadWorkspace(pending.restaurantID);
+    } else {
+      error.textContent = "Die E-Mail ist noch nicht bestätigt. Bitte öffne zuerst den Link in der E-Mail.";
+      error.classList.remove("hidden");
+    }
+  } catch (caught) {
+    error.textContent = friendlyError(caught);
+    error.classList.remove("hidden");
+  } finally {
+    button.disabled = false;
+    button.textContent = "Ich habe bestätigt – weiter";
+  }
+}
+
+async function resendEmailVerification() {
+  const pending = app.pendingVerification;
+  if (!pending?.email) return;
+  const button = $("verify-resend-button");
+  const error = $("verify-error");
+  error.classList.add("hidden");
+  button.disabled = true;
+  button.textContent = "Wird gesendet …";
+  try {
+    await requestOwnerEmailVerification(pending.email);
+    $("verify-message").textContent = `Wir haben einen neuen Bestätigungslink an ${pending.email} gesendet.`;
+  } catch (caught) {
+    error.textContent = friendlyError(caught);
+    error.classList.remove("hidden");
+  } finally {
+    button.disabled = false;
+    button.textContent = "Link erneut senden";
+  }
+}
+
 async function loadWorkspace(restaurantID = null) {
+  if (app.isLoggingOut) return;
   setSyncState("saving", "Wird geladen");
   const result = await rpc("web_get_restaurant_workspace", {
     p_restaurant_id: restaurantID
   });
+  if (app.isLoggingOut) return;
   if (!result?.restaurantId) throw new Error("Kein Restaurantzugang gefunden.");
   app.workspace = result;
   app.data = normalizeState(result.state);
@@ -685,6 +829,7 @@ function showAuth() {
   document.title = "Anmelden | Haviko";
   document.body.classList.remove("is-booting");
   $("boot-shell")?.classList.add("hidden");
+  $("verify-shell")?.classList.add("hidden");
   $("auth-shell").classList.remove("hidden");
   $("app-shell").classList.add("hidden");
 }
@@ -693,6 +838,7 @@ function showWorkspace() {
   document.title = "Dashboard | Haviko";
   document.body.classList.remove("is-booting");
   $("boot-shell")?.classList.add("hidden");
+  $("verify-shell")?.classList.add("hidden");
   $("auth-shell").classList.add("hidden");
   $("app-shell").classList.remove("hidden");
   $("restaurant-name").textContent = app.data.restaurantName;
@@ -2773,31 +2919,118 @@ async function register(event) {
   const error = $("register-error");
   error.classList.add("hidden");
   button.disabled = true;
-  button.textContent = "Restaurant wird erstellt …";
+  button.textContent = "Einrichtung wird erstellt …";
   try {
+    if (!$("register-terms").checked || !$("register-privacy").checked) {
+      throw new Error("Bitte bestätige Nutzungsbedingungen und Datenschutzerklärung.");
+    }
+    const setup = registrationSetup();
+    if (!setup.email || !$("register-email").checkValidity()) {
+      throw new Error("Bitte gib eine gültige Recovery-E-Mail-Adresse ein.");
+    }
     await ensureSession();
+    const legalBundle = await fetchLegalBundle();
     const rows = await rpc("create_restaurant_account", {
       p_restaurant_name: $("register-name").value.trim(),
       p_restaurant_type: $("register-type").value,
       p_owner_username: $("register-username").value.trim(),
       p_owner_password: $("register-password").value,
-      p_owner_display_name: $("register-username").value.trim()
+      p_owner_display_name: $("register-username").value.trim(),
+      p_terms_version: legalBundle.termsVersion || 1,
+      p_privacy_version: legalBundle.privacyVersion || 1
     });
     const session = Array.isArray(rows) ? rows[0] : rows;
     if (!session?.restaurant_id) throw new Error("Restaurant konnte nicht erstellt werden.");
-    await initializeRestaurantState(session);
-    await loadWorkspace(session.restaurant_id);
-    toast("Restaurant erstellt", `Deine Kennung lautet ${session.restaurant_code}.`, "success");
+    await initializeRestaurantState(session, setup);
+    let emailVerificationSent = false;
+    try {
+      await requestOwnerEmailVerification(setup.email);
+      emailVerificationSent = true;
+    } catch {
+      emailVerificationSent = false;
+    }
+    showRegistrationSuccess(session);
+    showEmailVerificationGate({
+      restaurantID: session.restaurant_id,
+      email: setup.email,
+      sendFailed: !emailVerificationSent
+    });
   } catch (caught) {
     error.textContent = friendlyError(caught);
     error.classList.remove("hidden");
   } finally {
     button.disabled = false;
-    button.textContent = "Restaurant sicher erstellen";
+    button.textContent = "Einrichtung abschließen";
   }
 }
 
+function visibleRequiredRegisterFields(step) {
+  return [...document.querySelector(`[data-register-step="${step}"]`)
+    .querySelectorAll("input[required], select[required]")]
+    .filter((element) => !element.closest(".hidden"));
+}
+
+function validateRegisterStep(step, showErrors = false) {
+  const error = $(`register-step${step}-error`);
+  let valid = true;
+  for (const element of visibleRequiredRegisterFields(step)) {
+    const fieldValid = element.type === "checkbox"
+      ? element.checked
+      : element.value.trim() !== "" && element.checkValidity();
+    element.setAttribute("aria-invalid", showErrors && !fieldValid ? "true" : "false");
+    valid = valid && fieldValid;
+  }
+  if (error) {
+    error.textContent = "Bitte fülle die markierten Felder gültig aus.";
+    error.classList.toggle("hidden", !showErrors || valid);
+  }
+  return valid;
+}
+
+function renderRegisterReview() {
+  const setup = registrationSetup();
+  $("register-review").innerHTML = `
+    <h3>${escapeHTML($("register-name").value.trim() || "–")}</h3>
+    <p>${escapeHTML($("register-type").value)}</p>
+    <div class="detail-list">
+      <div><span>Restaurantleitung</span><strong>${escapeHTML($("register-username").value.trim() || "–")}</strong></div>
+      <div><span>Recovery-E-Mail</span><strong>${escapeHTML(setup.email || "–")}</strong></div>
+      <div><span>Telefon</span><strong>${escapeHTML(setup.phone || "–")}</strong></div>
+      <div><span>Adresse</span><strong>${escapeHTML(setup.address || "–")}</strong></div>
+    </div>
+  `;
+}
+
+function goToRegisterStep(nextStep) {
+  const currentSection = document.querySelector(".register-step:not(.hidden)");
+  const current = Number(currentSection?.dataset.registerStep);
+  if (Number.isFinite(current) && Number(nextStep) > current && !validateRegisterStep(current, true)) return;
+  for (const section of document.querySelectorAll("[data-register-step]")) {
+    section.classList.toggle("hidden", section.dataset.registerStep !== String(nextStep));
+  }
+  document.querySelector(".stepbar")?.classList.toggle("hidden", nextStep === "done");
+  for (const indicator of document.querySelectorAll("#register-form [data-step-indicator]")) {
+    const indicatorStep = Number(indicator.dataset.stepIndicator);
+    indicator.classList.toggle("is-complete", indicatorStep < Number(nextStep));
+    if (indicatorStep === Number(nextStep)) {
+      indicator.setAttribute("aria-current", "step");
+    } else {
+      indicator.removeAttribute("aria-current");
+    }
+  }
+  if (nextStep === 4) renderRegisterReview();
+  $("register-form").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function resetRegisterWizard() {
+  document.querySelector(".stepbar")?.classList.remove("hidden");
+  $("register-form").reset();
+  goToRegisterStep(1);
+}
+
 async function logout() {
+  if (app.isLoggingOut) return;
+  app.isLoggingOut = true;
   try {
     if (app.session?.access_token) {
       await fetch(`${SUPABASE_URL}/auth/v1/logout`, {
@@ -2807,7 +3040,13 @@ async function logout() {
     }
   } finally {
     clearSession();
-    window.location.replace(LOGIN_URL);
+    if ($("modal")?.open) closeModal();
+    if (IS_LOGIN_HOST) {
+      showAuth();
+      app.isLoggingOut = false;
+    } else {
+      window.location.replace(LOGIN_URL);
+    }
   }
 }
 
@@ -2824,6 +3063,9 @@ function switchAuth(mode) {
   $("auth-subtitle").textContent = loginMode
     ? "Mit Restaurantkennung und persönlichem Zugang."
     : "Starte leer und richte deinen Betrieb anschließend ein.";
+  if (!loginMode && document.querySelector(".register-step:not(.hidden)")?.dataset.registerStep === "done") {
+    resetRegisterWizard();
+  }
 }
 
 async function submitGate(event) {
@@ -2842,6 +3084,7 @@ function updateOnlineStatus() {
 }
 
 async function start() {
+  if (app.isLoggingOut) return;
   switchAuth(INITIAL_AUTH_MODE);
   try {
     const stored = readStoredSession();
@@ -2873,6 +3116,27 @@ $("login-form").addEventListener("submit", login);
 $("register-form").addEventListener("submit", register);
 $("login-tab").addEventListener("click", () => switchAuth("login"));
 $("register-tab").addEventListener("click", () => switchAuth("register"));
+$("register-form").addEventListener("click", (event) => {
+  const nextButton = event.target.closest("[data-next-step]");
+  if (nextButton) goToRegisterStep(Number(nextButton.dataset.nextStep));
+  const previousButton = event.target.closest("[data-previous-step]");
+  if (previousButton) goToRegisterStep(Number(previousButton.dataset.previousStep));
+});
+$("register-form").addEventListener("keydown", (event) => {
+  if (event.key !== "Enter" || event.target.tagName === "TEXTAREA") return;
+  const nextButton = document.querySelector(".register-step:not(.hidden) [data-next-step]");
+  if (nextButton) {
+    event.preventDefault();
+    goToRegisterStep(Number(nextButton.dataset.nextStep));
+  }
+});
+$("verify-refresh-button").addEventListener("click", checkEmailVerification);
+$("verify-resend-button").addEventListener("click", resendEmailVerification);
+$("verify-logout-button").addEventListener("click", () => {
+  app.pendingVerification = null;
+  hideEmailVerificationGate();
+  logout();
+});
 $("logout-button").addEventListener("click", logout);
 $("restaurant-button").addEventListener("click", openAccountMenu);
 $("refresh-button").addEventListener("click", () => loadWorkspace(app.workspace.restaurantId));
