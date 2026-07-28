@@ -696,6 +696,117 @@ async function handleEmailConfirmationRedirect() {
   return true;
 }
 
+async function requestPasswordReset(restaurantCode) {
+  const response = await fetch(`${SUPABASE_URL}/functions/v1/owner-password-reset`, {
+    method: "POST",
+    headers: {
+      apikey: SUPABASE_KEY,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ restaurantCode })
+  });
+  return parseResponse(response);
+}
+
+function showForgotPasswordShell() {
+  $("forgot-password-error").classList.add("hidden");
+  $("forgot-password-success").classList.add("hidden");
+  $("forgot-password-code").value = $("login-code").value.trim();
+  $("forgot-password-form").classList.remove("hidden");
+  $("forgot-password-shell").classList.remove("hidden");
+}
+
+function hideForgotPasswordShell() {
+  $("forgot-password-shell").classList.add("hidden");
+}
+
+async function submitForgotPassword(event) {
+  event.preventDefault();
+  const button = $("forgot-password-submit");
+  const error = $("forgot-password-error");
+  error.classList.add("hidden");
+  const restaurantCode = $("forgot-password-code").value.trim();
+  if (!restaurantCode) return;
+  button.disabled = true;
+  button.textContent = "Wird gesendet …";
+  try {
+    await requestPasswordReset(restaurantCode);
+    $("forgot-password-form").classList.add("hidden");
+    $("forgot-password-success").classList.remove("hidden");
+  } catch (caught) {
+    error.textContent = friendlyError(caught);
+    error.classList.remove("hidden");
+  } finally {
+    button.disabled = false;
+    button.textContent = "Link anfordern";
+  }
+}
+
+async function handlePasswordResetRedirect() {
+  const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+  const type = hashParams.get("type");
+  const accessToken = hashParams.get("access_token");
+  if (!accessToken || type !== "recovery") return false;
+  const session = {
+    access_token: accessToken,
+    refresh_token: hashParams.get("refresh_token"),
+    token_type: hashParams.get("token_type") || "bearer",
+    expires_in: Number(hashParams.get("expires_in") || 3600)
+  };
+  session.expires_at = Math.floor(Date.now() / 1000) + session.expires_in;
+  saveSession(session);
+  history.replaceState({}, "", window.location.pathname);
+  $("boot-shell")?.classList.add("hidden");
+  document.body.classList.remove("is-booting");
+  $("reset-shell").classList.remove("hidden");
+  return true;
+}
+
+async function submitPasswordReset(event) {
+  event.preventDefault();
+  const button = $("reset-password-submit");
+  const error = $("reset-password-error");
+  error.classList.add("hidden");
+  const newPassword = $("reset-password-new").value;
+  const confirmPassword = $("reset-password-confirm").value;
+  if (newPassword.length < 10) {
+    error.textContent = "Das neue Passwort muss mindestens 10 Zeichen haben.";
+    error.classList.remove("hidden");
+    return;
+  }
+  if (newPassword !== confirmPassword) {
+    error.textContent = "Die Passwörter stimmen nicht überein.";
+    error.classList.remove("hidden");
+    return;
+  }
+  button.disabled = true;
+  button.textContent = "Wird gespeichert …";
+  try {
+    const userResponse = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+      headers: authHeaders(false)
+    });
+    const user = await parseResponse(userResponse);
+    const resetToken = user?.user_metadata?.servora_password_reset_token;
+    if (!resetToken) throw new Error("Invalid or expired reset token");
+    await rpc("complete_owner_password_reset", {
+      p_reset_token: resetToken,
+      p_new_password: newPassword
+    });
+    $("reset-password-form").innerHTML = `
+      <div class="empty-state">
+        <h2>Passwort gespeichert</h2>
+        <p>Du kannst dich jetzt mit deinem neuen Passwort anmelden.</p>
+        <button class="primary full" type="button" id="reset-password-done">Zur Anmeldung</button>
+      </div>`;
+    $("reset-password-done").addEventListener("click", () => window.location.assign(LOGIN_URL));
+  } catch (caught) {
+    error.textContent = friendlyError(caught);
+    error.classList.remove("hidden");
+    button.disabled = false;
+    button.textContent = "Passwort speichern";
+  }
+}
+
 function showRegistrationSuccess(session) {
   saveLastRestaurant(session.restaurant_id);
   document.title = "Einrichtung abgeschlossen | Haviko";
@@ -868,6 +979,8 @@ function showAuth() {
   document.body.classList.remove("is-booting");
   $("boot-shell")?.classList.add("hidden");
   $("verify-shell")?.classList.add("hidden");
+  $("forgot-password-shell")?.classList.add("hidden");
+  $("reset-shell")?.classList.add("hidden");
   $("auth-shell").classList.remove("hidden");
   $("app-shell").classList.add("hidden");
 }
@@ -3203,6 +3316,10 @@ $("verify-logout-button").addEventListener("click", () => {
   hideEmailVerificationGate();
   logout();
 });
+$("forgot-password-link").addEventListener("click", showForgotPasswordShell);
+$("forgot-password-close").addEventListener("click", hideForgotPasswordShell);
+$("forgot-password-form").addEventListener("submit", submitForgotPassword);
+$("reset-password-form").addEventListener("submit", submitPasswordReset);
 $("logout-button").addEventListener("click", logout);
 $("restaurant-button").addEventListener("click", openAccountMenu);
 $("refresh-button").addEventListener("click", () => loadWorkspace(app.workspace.restaurantId));
@@ -3243,11 +3360,16 @@ updateOnlineStatus();
 const isEmailConfirmationRedirect =
   new URLSearchParams(window.location.search).has("verify_restaurant") ||
   /(^|&)type=(email_change|signup)(&|$)/.test(window.location.hash.replace(/^#/, ""));
+const isPasswordResetRedirect =
+  new URLSearchParams(window.location.search).has("password_reset") ||
+  /(^|&)type=recovery(&|$)/.test(window.location.hash.replace(/^#/, ""));
 (async () => {
   const underMaintenance = await checkMaintenanceMode();
   setInterval(checkMaintenanceMode, 30000);
   if (underMaintenance) return;
-  if (isEmailConfirmationRedirect) {
+  if (isPasswordResetRedirect) {
+    handlePasswordResetRedirect();
+  } else if (isEmailConfirmationRedirect) {
     handleEmailConfirmationRedirect();
   } else if (
     !DEVELOPMENT_MODE ||

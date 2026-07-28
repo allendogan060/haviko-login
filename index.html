@@ -21,7 +21,8 @@
     (() => {
       const isEmailConfirmation =
         new URLSearchParams(window.location.search).has("verify_restaurant") ||
-        /(^|&)type=(email_change|signup)(&|$)/.test(window.location.hash.replace(/^#/, ""));
+        new URLSearchParams(window.location.search).has("password_reset") ||
+        /(^|&)type=(email_change|signup|recovery)(&|$)/.test(window.location.hash.replace(/^#/, ""));
       if (isEmailConfirmation) return;
       const hasAccess = document.cookie
         .split(";")
@@ -89,6 +90,42 @@
     </div>
   </section>
 
+  <section class="verify-shell hidden" id="forgot-password-shell" aria-label="Passwort vergessen" aria-live="polite">
+    <img class="empty-mark" src="./assets/haviko-app-icon.png" alt="">
+    <h1>Passwort vergessen?</h1>
+    <p>Gib deine Restaurantkennung ein. Falls ein Konto mit bestätigter Recovery-E-Mail existiert, senden wir einen Link zum Zurücksetzen.</p>
+    <form id="forgot-password-form">
+      <label class="field">
+        <span>Restaurantkennung</span>
+        <input id="forgot-password-code" autocomplete="organization" placeholder="z. B. SERV-ABCD" required>
+      </label>
+      <p class="form-error hidden" id="forgot-password-error" role="alert"></p>
+      <p class="field-hint hidden" id="forgot-password-success">Falls ein Konto mit dieser Kennung existiert, wurde eine E-Mail versendet.</p>
+      <div class="verify-actions">
+        <button class="primary full" id="forgot-password-submit" type="submit">Link anfordern</button>
+        <button class="quiet full" type="button" id="forgot-password-close">Zurück zur Anmeldung</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="verify-shell hidden" id="reset-shell" aria-label="Neues Passwort setzen" aria-live="polite">
+    <img class="empty-mark" src="./assets/haviko-app-icon.png" alt="">
+    <h1>Neues Passwort setzen</h1>
+    <p>Lege ein neues Passwort für dein Haviko-Konto fest.</p>
+    <form id="reset-password-form">
+      <label class="field">
+        <span>Neues Passwort</span>
+        <input id="reset-password-new" type="password" autocomplete="new-password" minlength="10" required>
+      </label>
+      <label class="field">
+        <span>Neues Passwort bestätigen</span>
+        <input id="reset-password-confirm" type="password" autocomplete="new-password" minlength="10" required>
+      </label>
+      <p class="form-error hidden" id="reset-password-error" role="alert"></p>
+      <button class="primary full" id="reset-password-submit" type="submit">Passwort speichern</button>
+    </form>
+  </section>
+
   <main class="auth-shell hidden" id="auth-shell">
     <section class="auth-brand">
       <div class="brand-lockup"><img class="brand-mark large" src="./assets/haviko-app-icon.png" alt=""><span>Haviko</span></div>
@@ -132,6 +169,7 @@
         <p class="field-hint">Geräte- und Druckerzugänge werden ausschließlich in der Haviko-App verwendet.</p>
         <p class="form-error hidden" id="login-error" role="alert"></p>
         <button class="primary full" id="login-submit" type="submit">Anmelden</button>
+        <button class="quiet full" type="button" id="forgot-password-link">Passwort vergessen?</button>
       </form>
 
       <form class="hidden" id="register-form" novalidate>
