@@ -19,6 +19,10 @@
   <link rel="stylesheet" href="./styles.css?v=6">
   <script>
     (() => {
+      const isEmailConfirmation =
+        new URLSearchParams(window.location.search).has("verify_restaurant") ||
+        /(^|&)type=(email_change|signup)(&|$)/.test(window.location.hash.replace(/^#/, ""));
+      if (isEmailConfirmation) return;
       const hasAccess = document.cookie
         .split(";")
         .map((value) => value.trim())
@@ -58,6 +62,12 @@
     </form>
   </section>
 
+  <section class="verify-shell hidden" id="maintenance-shell" aria-label="Wartungsarbeiten" aria-live="polite">
+    <img class="empty-mark" src="./assets/haviko-app-icon.png" alt="">
+    <h1>Wartungsarbeiten</h1>
+    <p id="maintenance-message">Haviko führt gerade Wartungsarbeiten durch. Bitte versuche es in Kürze erneut.</p>
+  </section>
+
   <section class="verify-shell hidden" id="verify-shell" aria-label="E-Mail bestätigen" aria-live="polite">
     <img class="empty-mark" src="./assets/haviko-app-icon.png" alt="">
     <h1>E-Mail bestätigen</h1>
@@ -67,6 +77,15 @@
       <button class="primary full" id="verify-refresh-button" type="button">Ich habe bestätigt – weiter</button>
       <button class="secondary full" id="verify-resend-button" type="button">Link erneut senden</button>
       <button class="quiet full" id="verify-logout-button" type="button">Abmelden</button>
+    </div>
+  </section>
+
+  <section class="verify-shell hidden" id="confirmed-shell" aria-label="E-Mail bestätigt" aria-live="polite">
+    <img class="empty-mark" src="./assets/haviko-app-icon.png" alt="">
+    <h1>✓ E-Mail bestätigt</h1>
+    <p>Deine E-Mail-Adresse wurde erfolgreich bestätigt. Eine App wird dafür nicht benötigt – du kannst direkt fortfahren.</p>
+    <div class="verify-actions">
+      <button class="primary full" id="confirmed-continue-button" type="button">Zum Dashboard</button>
     </div>
   </section>
 

@@ -650,13 +650,50 @@ async function fetchLegalBundle() {
   }
 }
 
-async function requestOwnerEmailVerification(email) {
-  const response = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
-    method: "PUT",
-    headers: authHeaders(),
-    body: JSON.stringify({ email })
-  });
+async function requestOwnerEmailVerification(email, restaurantID) {
+  const redirectTo = `${LOGIN_URL}?verify_restaurant=${encodeURIComponent(restaurantID)}`;
+  const response = await fetch(
+    `${SUPABASE_URL}/auth/v1/user?redirect_to=${encodeURIComponent(redirectTo)}`,
+    {
+      method: "PUT",
+      headers: authHeaders(),
+      body: JSON.stringify({ email })
+    }
+  );
   return parseResponse(response);
+}
+
+async function handleEmailConfirmationRedirect() {
+  const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+  const type = hashParams.get("type");
+  const accessToken = hashParams.get("access_token");
+  if (!accessToken || (type !== "email_change" && type !== "signup")) return false;
+  const restaurantID = new URLSearchParams(window.location.search).get("verify_restaurant");
+  const session = {
+    access_token: accessToken,
+    refresh_token: hashParams.get("refresh_token"),
+    token_type: hashParams.get("token_type") || "bearer",
+    expires_in: Number(hashParams.get("expires_in") || 3600)
+  };
+  session.expires_at = Math.floor(Date.now() / 1000) + session.expires_in;
+  saveSession(session);
+  history.replaceState({}, "", window.location.pathname);
+  $("boot-shell")?.classList.add("hidden");
+  document.body.classList.remove("is-booting");
+  $("confirmed-shell").classList.remove("hidden");
+  const continueButton = $("confirmed-continue-button");
+  if (restaurantID) {
+    try {
+      await rpc("sync_primary_owner_auth_email", { p_restaurant_id: restaurantID });
+    } catch {
+      /* confirmation still succeeded even if the sync retry fails; user can retry from the dashboard */
+    }
+    continueButton.addEventListener("click", () => window.location.assign(DASHBOARD_URL), { once: true });
+  } else {
+    continueButton.textContent = "Schließen";
+    continueButton.addEventListener("click", () => window.close(), { once: true });
+  }
+  return true;
 }
 
 function showRegistrationSuccess(session) {
@@ -722,7 +759,7 @@ async function resendEmailVerification() {
   button.disabled = true;
   button.textContent = "Wird gesendet …";
   try {
-    await requestOwnerEmailVerification(pending.email);
+    await requestOwnerEmailVerification(pending.email, pending.restaurantID);
     $("verify-message").textContent = `Wir haben einen neuen Bestätigungslink an ${pending.email} gesendet.`;
   } catch (caught) {
     error.textContent = friendlyError(caught);
@@ -2945,7 +2982,7 @@ async function register(event) {
     await initializeRestaurantState(session, setup);
     let emailVerificationSent = false;
     try {
-      await requestOwnerEmailVerification(setup.email);
+      await requestOwnerEmailVerification(setup.email, session.restaurant_id);
       emailVerificationSent = true;
     } catch {
       emailVerificationSent = false;
@@ -3184,15 +3221,43 @@ $("view").addEventListener("submit", (event) => {
 window.addEventListener("online", updateOnlineStatus);
 window.addEventListener("offline", updateOnlineStatus);
 
-updateOnlineStatus();
-if (
-  !DEVELOPMENT_MODE ||
-  readCookie("haviko_preview_access") === "granted"
-) {
-  $("development-gate").classList.add("hidden");
-  start();
-} else {
-  window.location.replace(
-    `https://autorisieren.haviko.de/?next=${encodeURIComponent(window.location.href)}`
-  );
+async function checkMaintenanceMode() {
+  try {
+    const status = await rpc("get_system_status");
+    const active = Boolean(status?.maintenance_mode);
+    if (status?.maintenance_message) {
+      $("maintenance-message").textContent = status.maintenance_message;
+    }
+    $("maintenance-shell").classList.toggle("hidden", !active);
+    if (active) {
+      $("boot-shell")?.classList.add("hidden");
+      document.body.classList.remove("is-booting");
+    }
+    return active;
+  } catch {
+    return false;
+  }
 }
+
+updateOnlineStatus();
+const isEmailConfirmationRedirect =
+  new URLSearchParams(window.location.search).has("verify_restaurant") ||
+  /(^|&)type=(email_change|signup)(&|$)/.test(window.location.hash.replace(/^#/, ""));
+(async () => {
+  const underMaintenance = await checkMaintenanceMode();
+  setInterval(checkMaintenanceMode, 30000);
+  if (underMaintenance) return;
+  if (isEmailConfirmationRedirect) {
+    handleEmailConfirmationRedirect();
+  } else if (
+    !DEVELOPMENT_MODE ||
+    readCookie("haviko_preview_access") === "granted"
+  ) {
+    $("development-gate").classList.add("hidden");
+    start();
+  } else {
+    window.location.replace(
+      `https://autorisieren.haviko.de/?next=${encodeURIComponent(window.location.href)}`
+    );
+  }
+})();
