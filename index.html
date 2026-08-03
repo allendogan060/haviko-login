@@ -94,6 +94,22 @@
     </div>
   </section>
 
+  <section class="verify-shell hidden" id="login-2fa-shell" aria-label="Anmeldecode bestätigen" aria-live="polite">
+    <img class="empty-mark" src="./assets/haviko-app-icon.png" alt="">
+    <h1>Anmeldecode</h1>
+    <p id="login-2fa-message">Wir haben einen 6-stelligen Anmeldecode per E-Mail gesendet. Gib ihn unten ein, um dich anzumelden.</p>
+    <label class="field">
+      <span>Anmeldecode</span>
+      <input id="login-2fa-code" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="one-time-code" placeholder="000000">
+    </label>
+    <p class="form-error hidden" id="login-2fa-error" role="alert"></p>
+    <div class="verify-actions">
+      <button class="primary full" id="login-2fa-confirm-button" type="button">Bestätigen – anmelden</button>
+      <button class="secondary full" id="login-2fa-resend-button" type="button">Code erneut senden</button>
+      <button class="quiet full" id="login-2fa-cancel-button" type="button">Abbrechen</button>
+    </div>
+  </section>
+
   <section class="verify-shell hidden" id="forgot-password-shell" aria-label="Passwort vergessen" aria-live="polite">
     <img class="empty-mark" src="./assets/haviko-app-icon.png" alt="">
     <h1>Passwort vergessen?</h1>

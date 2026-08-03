@@ -685,16 +685,23 @@ async function fetchLegalBundle() {
 }
 
 async function requestOwnerEmailVerification(email, restaurantID) {
-  const redirectTo = `${LOGIN_URL}?verify_restaurant=${encodeURIComponent(restaurantID)}`;
   const response = await fetch(
-    `${SUPABASE_URL}/auth/v1/user?redirect_to=${encodeURIComponent(redirectTo)}`,
+    `${SUPABASE_URL}/functions/v1/registration-email-verification`,
     {
-      method: "PUT",
+      method: "POST",
       headers: authHeaders(),
-      body: JSON.stringify({ email })
+      body: JSON.stringify({ email, restaurantId: restaurantID })
     }
   );
   return parseResponse(response);
+}
+
+async function verifyRegistrationEmailCode(restaurantID, code) {
+  const rows = await rpc("verify_registration_email_code", {
+    p_restaurant_id: restaurantID,
+    p_code: code
+  });
+  return Array.isArray(rows) ? rows[0] : rows;
 }
 
 async function handleEmailConfirmationRedirect() {
@@ -740,6 +747,133 @@ async function requestPasswordReset(restaurantCode) {
     body: JSON.stringify({ restaurantCode })
   });
   return parseResponse(response);
+}
+
+async function requestLogin2FACode(restaurantCode, username) {
+  const response = await fetch(`${SUPABASE_URL}/functions/v1/team-member-login-2fa`, {
+    method: "POST",
+    headers: {
+      apikey: SUPABASE_KEY,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ restaurantCode, username })
+  });
+  return parseResponse(response);
+}
+
+function showLogin2FAShell() {
+  $("login-2fa-error").classList.add("hidden");
+  $("login-2fa-code").value = "";
+  $("login-2fa-message").textContent = "Wir haben einen 6-stelligen Anmeldecode per E-Mail gesendet. Gib ihn unten ein, um dich anzumelden.";
+  $("login-2fa-shell").classList.remove("hidden");
+  $("login-2fa-code").focus();
+}
+
+function hideLogin2FAShell() {
+  $("login-2fa-shell").classList.add("hidden");
+}
+
+function startLogin2FACooldown(seconds = 30) {
+  const button = $("login-2fa-resend-button");
+  if (app.login2FACooldownTimer) clearInterval(app.login2FACooldownTimer);
+  let remaining = seconds;
+  const update = () => {
+    if (remaining > 0) {
+      button.disabled = true;
+      button.classList.add("is-cooling-down");
+      button.textContent = `Code erneut senden (${remaining}s)`;
+    } else {
+      button.disabled = false;
+      button.classList.remove("is-cooling-down");
+      button.textContent = "Code erneut senden";
+      clearInterval(app.login2FACooldownTimer);
+      app.login2FACooldownTimer = null;
+    }
+    remaining -= 1;
+  };
+  update();
+  app.login2FACooldownTimer = setInterval(update, 1000);
+}
+
+async function resendLogin2FACode() {
+  const pending = app.pendingLogin2FA;
+  if (!pending) return;
+  const button = $("login-2fa-resend-button");
+  const error = $("login-2fa-error");
+  error.classList.add("hidden");
+  button.disabled = true;
+  button.textContent = "Wird gesendet …";
+  try {
+    await requestLogin2FACode(pending.restaurantCode, pending.username);
+    $("login-2fa-code").value = "";
+    $("login-2fa-message").textContent = "Wir haben dir einen neuen Anmeldecode gesendet.";
+    startLogin2FACooldown();
+  } catch (caught) {
+    error.textContent = friendlyError(caught);
+    error.classList.remove("hidden");
+    button.disabled = false;
+    button.textContent = "Code erneut senden";
+  }
+}
+
+function cancelLogin2FA() {
+  app.pendingLogin2FA = null;
+  if (app.login2FACooldownTimer) {
+    clearInterval(app.login2FACooldownTimer);
+    app.login2FACooldownTimer = null;
+  }
+  hideLogin2FAShell();
+}
+
+async function confirmLogin2FA() {
+  const pending = app.pendingLogin2FA;
+  if (!pending) return;
+  const button = $("login-2fa-confirm-button");
+  const error = $("login-2fa-error");
+  const code = $("login-2fa-code").value.trim();
+  error.classList.add("hidden");
+  if (!/^\d{6}$/.test(code)) {
+    error.textContent = "Bitte gib den 6-stelligen Code ein.";
+    error.classList.remove("hidden");
+    return;
+  }
+  button.disabled = true;
+  button.textContent = "Wird geprüft …";
+  try {
+    const ok = await rpc("check_team_member_login_2fa_code", {
+      p_restaurant_code: pending.restaurantCode,
+      p_username: pending.username,
+      p_code: code
+    });
+    if (!ok) {
+      throw new Error("Der Code ist ungültig oder abgelaufen.");
+    }
+    if (app.login2FACooldownTimer) {
+      clearInterval(app.login2FACooldownTimer);
+      app.login2FACooldownTimer = null;
+    }
+    hideLogin2FAShell();
+    await loadWorkspace(pending.session.restaurant_id);
+    const isDeviceAccess = app.data.devices.some(
+      (device) =>
+        String(device.loginName || device.name).localeCompare(
+          pending.session.username,
+          "de",
+          { sensitivity: "base" }
+        ) === 0
+    );
+    if (isDeviceAccess) {
+      await logout();
+      throw new Error("Gerätezugänge können sich nur in der Haviko-App anmelden.");
+    }
+    app.pendingLogin2FA = null;
+  } catch (caught) {
+    error.textContent = friendlyError(caught);
+    error.classList.remove("hidden");
+  } finally {
+    button.disabled = false;
+    button.textContent = "Bestätigen – anmelden";
+  }
 }
 
 function showForgotPasswordShell() {
@@ -855,10 +989,15 @@ function showEmailVerificationGate({ restaurantID, email, sendFailed = false }) 
   app.pendingVerification = { restaurantID, email };
   $("verify-email").textContent = email || "–";
   $("verify-error").classList.add("hidden");
+  $("verify-code").value = "";
   $("verify-message").textContent = sendFailed
-    ? "Die Bestätigungs-E-Mail konnte gerade nicht gesendet werden. Bitte versuche es erneut."
-    : `Wir haben einen Bestätigungslink an ${email || "deine Recovery-E-Mail"} gesendet. Bitte bestätige die Adresse, um fortzufahren.`;
+    ? "Der Bestätigungscode konnte gerade nicht gesendet werden. Bitte versuche es erneut."
+    : `Wir haben einen 6-stelligen Bestätigungscode an ${email || "deine Recovery-E-Mail"} gesendet. Gib ihn unten ein, um fortzufahren.`;
   $("verify-shell").classList.remove("hidden");
+  if (!sendFailed) {
+    $("verify-code").focus();
+    startResendCooldown();
+  }
 }
 
 function hideEmailVerificationGate() {
@@ -870,20 +1009,23 @@ async function checkEmailVerification() {
   if (!pending?.restaurantID) return;
   const button = $("verify-refresh-button");
   const error = $("verify-error");
+  const code = $("verify-code").value.trim();
   error.classList.add("hidden");
+  if (!/^\d{6}$/.test(code)) {
+    error.textContent = "Bitte gib den 6-stelligen Code aus der E-Mail ein.";
+    error.classList.remove("hidden");
+    return;
+  }
   button.disabled = true;
   button.textContent = "Wird geprüft …";
   try {
-    const rows = await rpc("sync_primary_owner_auth_email", {
-      p_restaurant_id: pending.restaurantID
-    });
-    const row = Array.isArray(rows) ? rows[0] : rows;
+    const row = await verifyRegistrationEmailCode(pending.restaurantID, code);
     if (row?.is_verified) {
       hideEmailVerificationGate();
       app.pendingVerification = null;
       await loadWorkspace(pending.restaurantID);
     } else {
-      error.textContent = "Die E-Mail ist noch nicht bestätigt. Bitte öffne zuerst den Link in der E-Mail.";
+      error.textContent = "Der Code ist ungültig oder abgelaufen. Bitte fordere einen neuen an.";
       error.classList.remove("hidden");
     }
   } catch (caught) {
@@ -891,8 +1033,30 @@ async function checkEmailVerification() {
     error.classList.remove("hidden");
   } finally {
     button.disabled = false;
-    button.textContent = "Ich habe bestätigt – weiter";
+    button.textContent = "Bestätigen – weiter";
   }
+}
+
+function startResendCooldown(seconds = 30) {
+  const button = $("verify-resend-button");
+  if (app.resendCooldownTimer) clearInterval(app.resendCooldownTimer);
+  let remaining = seconds;
+  const update = () => {
+    if (remaining > 0) {
+      button.disabled = true;
+      button.classList.add("is-cooling-down");
+      button.textContent = `Code erneut senden (${remaining}s)`;
+    } else {
+      button.disabled = false;
+      button.classList.remove("is-cooling-down");
+      button.textContent = "Code erneut senden";
+      clearInterval(app.resendCooldownTimer);
+      app.resendCooldownTimer = null;
+    }
+    remaining -= 1;
+  };
+  update();
+  app.resendCooldownTimer = setInterval(update, 1000);
 }
 
 async function resendEmailVerification() {
@@ -905,13 +1069,14 @@ async function resendEmailVerification() {
   button.textContent = "Wird gesendet …";
   try {
     await requestOwnerEmailVerification(pending.email, pending.restaurantID);
-    $("verify-message").textContent = `Wir haben einen neuen Bestätigungslink an ${pending.email} gesendet.`;
+    $("verify-code").value = "";
+    $("verify-message").textContent = `Wir haben einen neuen Code an ${pending.email} gesendet.`;
+    startResendCooldown();
   } catch (caught) {
     error.textContent = friendlyError(caught);
     error.classList.remove("hidden");
-  } finally {
     button.disabled = false;
-    button.textContent = "Link erneut senden";
+    button.textContent = "Code erneut senden";
   }
 }
 
@@ -1010,6 +1175,18 @@ function friendlyError(error) {
   }
   if (message.includes("Access denied")) {
     return "Deine Rolle darf diese Aktion nicht ausführen.";
+  }
+  if (message.includes("Invalid restaurant data")) {
+    return "Bitte prüfe Restaurantname, Benutzername (mind. 2 Zeichen) und Passwort (mind. 6 Zeichen).";
+  }
+  if (message.includes("Current legal consent required")) {
+    return "Die Nutzungsbedingungen wurden zwischenzeitlich aktualisiert. Bitte lade die Seite neu und versuche es erneut.";
+  }
+  if (message.toLowerCase().includes("invalid input syntax")) {
+    return "Bitte prüfe deine Eingaben auf ungültige Zeichen.";
+  }
+  if (message.includes("PGRST202") || message.toLowerCase().includes("could not find the function")) {
+    return "Ein technisches Problem ist aufgetreten. Bitte versuche es in ein paar Minuten erneut oder wende dich an den Support.";
   }
   return message;
 }
@@ -1883,15 +2060,6 @@ function renderSettings() {
         <div class="section-body">
           <label class="field"><span>Name</span><input value="${escapeHTML(app.data.restaurantName)}" readonly aria-readonly="true"></label>
           <label class="field"><span>Restaurantkennung</span><input value="${escapeHTML(app.workspace.restaurantCode)}" readonly aria-readonly="true"></label>
-        </div>
-      </section>
-      <section class="section">
-        <header class="section-header"><h2>Technische Kassenbereitschaft</h2></header>
-        <div class="section-body compact-list">
-          ${settingStatus("Testmodus", fiscal.isTestMode ? "Aktiv" : "Aus", !fiscal.isTestMode)}
-          ${settingStatus("TSE", fiscal.fiscalizationState === "ready" ? "Bereit" : "Nicht konfiguriert", fiscal.fiscalizationState === "ready")}
-          ${settingStatus("DSFinV-K", fiscal.dsfinvKVersion || "2.4", Boolean(fiscal.dsfinvKVersion))}
-          <p class="field-hint">Web-Zahlungen bleiben gesperrt, solange keine zertifizierte TSE angebunden ist.</p>
         </div>
       </section>
       <section class="section">
@@ -3330,6 +3498,28 @@ async function login(event) {
     if (!Object.keys(roleTitles).includes(session.role)) {
       throw new Error("Gerätezugänge können sich nicht im Web-Dashboard anmelden.");
     }
+
+    const restaurantCode = $("login-code").value.trim().toUpperCase();
+    const username = $("login-username").value.trim();
+    let requirement = null;
+    try {
+      const requirementRows = await rpc("get_team_member_login_requirement", {
+        p_restaurant_code: restaurantCode,
+        p_username: username
+      });
+      requirement = Array.isArray(requirementRows) ? requirementRows[0] : requirementRows;
+    } catch {
+      /* if the check itself fails, fall back to normal login rather than locking the user out */
+    }
+
+    if (requirement?.two_factor_enabled) {
+      app.pendingLogin2FA = { restaurantCode, username, session };
+      await requestLogin2FACode(restaurantCode, username);
+      showLogin2FAShell();
+      startLogin2FACooldown();
+      return;
+    }
+
     await loadWorkspace(session.restaurant_id);
     const isDeviceAccess = app.data.devices.some(
       (device) =>
@@ -3439,20 +3629,29 @@ function updateLegalReadHint() {
   $("legal-read-hint").classList.toggle("hidden", bothRead);
 }
 
-function openLegalDocument(documentType) {
+async function openLegalDocument(documentType) {
   const isTerms = documentType === "terms_of_use";
   const link = $(isTerms ? "read-terms-link" : "read-privacy-link");
   const checkbox = $(isTerms ? "register-terms" : "register-privacy");
+  if (!app.legalBundle) {
+    await loadLegalBundleForReview();
+  }
   const doc = app.legalBundle?.documents?.find((item) => item.document_type === documentType);
-  if (doc) {
+  if (!doc) {
     openModal({
-      title: doc.title,
-      body: (doc.sections || [])
-        .map((section) => `<h3>${escapeHTML(section.title)}</h3><p>${escapeHTML(section.body)}</p>`)
-        .join(""),
+      title: "Nicht verfügbar",
+      body: `<p>Der Text konnte nicht geladen werden. Bitte prüfe deine Internetverbindung und versuche es erneut.</p>`,
       footer: `<button class="primary" type="button" data-modal-action="close">Schließen</button>`
     });
+    return;
   }
+  openModal({
+    title: doc.title,
+    body: (doc.sections || [])
+      .map((section) => `<h3>${escapeHTML(section.title)}</h3><p>${escapeHTML(section.body)}</p>`)
+      .join(""),
+    footer: `<button class="primary" type="button" data-modal-action="close">Schließen</button>`
+  });
   link.classList.add("is-read");
   checkbox.disabled = false;
   updateLegalReadHint();
@@ -3610,6 +3809,15 @@ $("verify-logout-button").addEventListener("click", () => {
 });
 $("forgot-password-link").addEventListener("click", showForgotPasswordShell);
 $("forgot-password-close").addEventListener("click", hideForgotPasswordShell);
+$("login-2fa-confirm-button").addEventListener("click", confirmLogin2FA);
+$("login-2fa-resend-button").addEventListener("click", resendLogin2FACode);
+$("login-2fa-cancel-button").addEventListener("click", cancelLogin2FA);
+$("login-2fa-code").addEventListener("keydown", (event) => {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    confirmLogin2FA();
+  }
+});
 $("forgot-password-form").addEventListener("submit", submitForgotPassword);
 $("reset-password-form").addEventListener("submit", submitPasswordReset);
 $("logout-button").addEventListener("click", logout);
