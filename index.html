@@ -72,11 +72,15 @@
   <section class="verify-shell hidden" id="verify-shell" aria-label="E-Mail bestätigen" aria-live="polite">
     <img class="empty-mark" src="./assets/haviko-app-icon.png" alt="">
     <h1>E-Mail bestätigen</h1>
-    <p id="verify-message">Wir haben einen Bestätigungslink an <strong id="verify-email">–</strong> gesendet. Bitte bestätige die Adresse, um fortzufahren.</p>
+    <p id="verify-message">Wir haben einen 6-stelligen Bestätigungscode an <strong id="verify-email">–</strong> gesendet. Gib ihn unten ein, um fortzufahren.</p>
+    <label class="field">
+      <span>Bestätigungscode</span>
+      <input id="verify-code" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="one-time-code" placeholder="000000">
+    </label>
     <p class="form-error hidden" id="verify-error" role="alert"></p>
     <div class="verify-actions">
-      <button class="primary full" id="verify-refresh-button" type="button">Ich habe bestätigt – weiter</button>
-      <button class="secondary full" id="verify-resend-button" type="button">Link erneut senden</button>
+      <button class="primary full" id="verify-refresh-button" type="button">Bestätigen – weiter</button>
+      <button class="secondary full" id="verify-resend-button" type="button">Code erneut senden</button>
       <button class="quiet full" id="verify-logout-button" type="button">Abmelden</button>
     </div>
   </section>
@@ -313,6 +317,15 @@
         </section>
       </form>
     </section>
+
+    <footer class="haviko-footer">
+      <span class="haviko-footer-brand"><strong>Haviko</strong> Login</span>
+      <nav class="haviko-footer-links" aria-label="Rechtliches und Support">
+        <a href="https://haviko.de/datenschutz">Datenschutz</a>
+        <a href="https://haviko.de/impressum">Impressum</a>
+        <a href="https://support.haviko.de/">Support</a>
+      </nav>
+    </footer>
   </main>
 
   <div class="app-shell hidden" id="app-shell">
