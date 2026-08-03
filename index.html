@@ -94,6 +94,15 @@
     </div>
   </section>
 
+  <section class="verify-shell hidden" id="pending-review-shell" aria-label="Restaurant wird geprüft" aria-live="polite">
+    <img class="empty-mark" src="./assets/haviko-app-icon.png" alt="">
+    <h1>Dein Restaurant wird geprüft</h1>
+    <p>Deine E-Mail-Adresse ist bestätigt. Bevor dein Restaurant freigeschaltet wird, prüfen wir es kurz manuell – das kann bis zu 24 Stunden dauern. Bitte versuch es danach einfach noch einmal anzumelden.</p>
+    <div class="verify-actions">
+      <button class="quiet full" id="pending-review-close-button" type="button">Zur Anmeldung</button>
+    </div>
+  </section>
+
   <section class="verify-shell hidden" id="login-2fa-shell" aria-label="Anmeldecode bestätigen" aria-live="polite">
     <img class="empty-mark" src="./assets/haviko-app-icon.png" alt="">
     <h1>Anmeldecode</h1>
@@ -310,6 +319,10 @@
             <p>Bitte prüfe deine Angaben und stimme zum Abschluss zu.</p>
           </div>
           <div class="review-block" id="register-review"></div>
+          <div class="form-error hidden" id="register-duplicate-warning" role="alert" style="background:#fff4e8;border-color:#f4c98d;color:#6d4519;">
+            Es gibt bei Haviko bereits ein Restaurant mit diesem Namen und dieser Adresse.
+            <button class="secondary" type="button" id="register-duplicate-login-button" style="margin-top:10px;">Restaurant übernehmen</button>
+          </div>
           <div class="legal-links">
             <button class="secondary" type="button" id="read-terms-link" data-legal-doc="terms_of_use">Nutzungsbedingungen lesen</button>
             <button class="secondary" type="button" id="read-privacy-link" data-legal-doc="privacy_policy">Datenschutzerklärung lesen</button>

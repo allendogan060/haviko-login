@@ -1052,7 +1052,14 @@ async function checkEmailVerification() {
     if (row?.is_verified) {
       hideEmailVerificationGate();
       app.pendingVerification = null;
-      await loadWorkspace(pending.restaurantID);
+      try {
+        await rpc("mark_restaurant_pending_review", { p_restaurant_id: pending.restaurantID });
+      } catch {
+        // Verification itself already succeeded either way.
+      }
+      $("boot-shell")?.classList.add("hidden");
+      document.body.classList.remove("is-booting");
+      $("pending-review-shell").classList.remove("hidden");
     } else {
       error.textContent = "Der Code ist ungültig oder abgelaufen. Bitte fordere einen neuen an.";
       error.classList.remove("hidden");
@@ -3578,6 +3585,20 @@ async function login(event) {
       throw new Error("Gerätezugänge können sich nicht im Web-Dashboard anmelden.");
     }
 
+    try {
+      const claimStatus = await rpc("get_restaurant_claim_status", { p_restaurant_id: session.restaurant_id });
+      if (claimStatus === "pending") {
+        $("pending-review-shell").classList.remove("hidden");
+        return;
+      }
+      if (claimStatus === "rejected") {
+        throw new Error("Dieses Restaurant konnte nicht freigeschaltet werden. Bitte kontaktiere den Haviko-Support.");
+      }
+    } catch (statusError) {
+      if (statusError instanceof Error && statusError.message.includes("Support")) throw statusError;
+      // If the status check itself fails, don't block an otherwise valid login over it.
+    }
+
     const restaurantCode = $("login-code").value.trim().toUpperCase();
     const username = $("login-username").value.trim();
     let requirement = null;
@@ -3772,8 +3793,25 @@ function goToRegisterStep(nextStep) {
   if (nextStep === 4) {
     renderRegisterReview();
     if (!app.legalBundle) loadLegalBundleForReview();
+    checkForDuplicateRestaurant();
   }
   $("register-form").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+async function checkForDuplicateRestaurant() {
+  const warning = $("register-duplicate-warning");
+  warning.classList.add("hidden");
+  try {
+    const name = $("register-name").value.trim();
+    const address = registrationSetup().address || "";
+    const matches = await rpc("find_matching_active_restaurant", {
+      p_name: name,
+      p_address: address
+    });
+    if (matches) warning.classList.remove("hidden");
+  } catch {
+    // If the check itself fails, don't block registration over it.
+  }
 }
 
 function resetRegisterWizard() {
@@ -3892,6 +3930,11 @@ $("login-username").addEventListener("keydown", (event) => {
 $("register-form").addEventListener("submit", register);
 $("login-tab").addEventListener("click", () => switchAuth("login"));
 $("register-tab").addEventListener("click", () => switchAuth("register"));
+$("register-duplicate-login-button").addEventListener("click", () => switchAuth("login"));
+$("pending-review-close-button").addEventListener("click", () => {
+  $("pending-review-shell").classList.add("hidden");
+  switchAuth("login");
+});
 $("register-form").addEventListener("click", (event) => {
   const nextButton = event.target.closest("[data-next-step]");
   if (nextButton) goToRegisterStep(Number(nextButton.dataset.nextStep));
