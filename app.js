@@ -40,8 +40,27 @@ function prefillClaimFields() {
   if (CLAIM_PARAMS.phone && $("register-phone") && !$("register-phone").value) {
     $("register-phone").value = CLAIM_PARAMS.phone;
   }
-  if (CLAIM_PARAMS.address && $("register-address") && !$("register-address").value) {
-    $("register-address").value = CLAIM_PARAMS.address;
+  if (CLAIM_PARAMS.address) {
+    // Best-effort split of a single address string (e.g. from Apple Maps)
+    // into the separate fields. Not perfect, but the user reviews and can
+    // correct it - they still have to click through every step regardless.
+    const match = CLAIM_PARAMS.address.match(/^(.*?)\s*,\s*(\d{4,6})?\s*(.*)$/);
+    if (match) {
+      const [, streetPart, postalCode, cityPart] = match;
+      const streetMatch = streetPart.match(/^(.*?)\s+(\d+\s*[a-zA-Z]?)$/);
+      if ($("register-street") && !$("register-street").value) {
+        $("register-street").value = streetMatch ? streetMatch[1] : streetPart;
+      }
+      if (streetMatch && $("register-house-number") && !$("register-house-number").value) {
+        $("register-house-number").value = streetMatch[2];
+      }
+      if (postalCode && $("register-postal-code") && !$("register-postal-code").value) {
+        $("register-postal-code").value = postalCode;
+      }
+      if (cityPart && $("register-city") && !$("register-city").value) {
+        $("register-city").value = cityPart;
+      }
+    }
   }
 }
 
@@ -655,6 +674,16 @@ async function initializeRestaurantState(session, setup = {}) {
   return result;
 }
 
+function composeRegisterAddress() {
+  const street = $("register-street").value.trim();
+  const houseNumber = $("register-house-number").value.trim();
+  const postalCode = $("register-postal-code").value.trim();
+  const city = $("register-city").value.trim();
+  const line1 = [street, houseNumber].filter(Boolean).join(" ");
+  const line2 = [postalCode, city].filter(Boolean).join(" ");
+  return [line1, line2].filter(Boolean).join(", ");
+}
+
 function registrationSetup() {
   const areas = $("register-areas").value
     .split(",")
@@ -666,7 +695,7 @@ function registrationSetup() {
     email: $("register-email").value.trim().toLowerCase(),
     phone: $("register-phone").value.trim(),
     website: $("register-website").value.trim(),
-    address: $("register-address").value.trim(),
+    address: composeRegisterAddress(),
     areas: areas.length ? areas : ["Innenbereich"],
     routing,
     reservationDuration
@@ -3659,6 +3688,18 @@ async function register(event) {
       throw new Error("Bitte gib eine gültige Recovery-E-Mail-Adresse ein.");
     }
     await ensureSession();
+    // Hard stop before anything else (no email is ever sent) if this looks
+    // like a restaurant that already has an active Haviko account.
+    const isDuplicate = await rpc("find_matching_active_restaurant", {
+      p_name: $("register-name").value.trim(),
+      p_address: setup.address
+    }).catch(() => false);
+    if (isDuplicate) {
+      $("register-duplicate-warning").classList.remove("hidden");
+      button.disabled = false;
+      button.textContent = "Einrichtung abschließen";
+      return;
+    }
     const emailAvailable = await rpc("is_email_available", { p_email: setup.email });
     if (!emailAvailable) {
       throw new Error("Diese E-Mail-Adresse wird bereits von einem anderen Konto verwendet.");
@@ -3930,7 +3971,9 @@ $("login-username").addEventListener("keydown", (event) => {
 $("register-form").addEventListener("submit", register);
 $("login-tab").addEventListener("click", () => switchAuth("login"));
 $("register-tab").addEventListener("click", () => switchAuth("register"));
-$("register-duplicate-login-button").addEventListener("click", () => switchAuth("login"));
+$("register-duplicate-login-button").addEventListener("click", () => {
+  window.location.href = LOGIN_URL;
+});
 $("pending-review-close-button").addEventListener("click", () => {
   $("pending-review-shell").classList.add("hidden");
   switchAuth("login");

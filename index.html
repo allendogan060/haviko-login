@@ -280,10 +280,26 @@
               <input id="register-website" type="url" autocomplete="url" placeholder="https://">
             </label>
           </div>
-          <label class="field">
-            <span>Adresse</span>
-            <input id="register-address" autocomplete="street-address">
-          </label>
+          <div class="field-grid">
+            <label class="field">
+              <span>Straße</span>
+              <input id="register-street" autocomplete="address-line1">
+            </label>
+            <label class="field">
+              <span>Hausnummer</span>
+              <input id="register-house-number" autocomplete="address-line2">
+            </label>
+          </div>
+          <div class="field-grid">
+            <label class="field">
+              <span>Postleitzahl</span>
+              <input id="register-postal-code" autocomplete="postal-code" inputmode="numeric">
+            </label>
+            <label class="field">
+              <span>Ort</span>
+              <input id="register-city" autocomplete="address-level2">
+            </label>
+          </div>
           <label class="field">
             <span>Bereiche</span>
             <input id="register-areas" value="Innenbereich, Terrasse">
@@ -319,9 +335,9 @@
             <p>Bitte prüfe deine Angaben und stimme zum Abschluss zu.</p>
           </div>
           <div class="review-block" id="register-review"></div>
-          <div class="form-error hidden" id="register-duplicate-warning" role="alert" style="background:#fff4e8;border-color:#f4c98d;color:#6d4519;">
-            Es gibt bei Haviko bereits ein Restaurant mit diesem Namen und dieser Adresse.
-            <button class="secondary" type="button" id="register-duplicate-login-button" style="margin-top:10px;">Restaurant übernehmen</button>
+          <div class="form-error hidden" id="register-duplicate-warning" role="alert">
+            Restaurant bereits vorhanden.
+            <button class="secondary" type="button" id="register-duplicate-login-button" style="margin-top:10px;">Übernehmen</button>
           </div>
           <div class="legal-links">
             <button class="secondary" type="button" id="read-terms-link" data-legal-doc="terms_of_use">Nutzungsbedingungen lesen</button>
