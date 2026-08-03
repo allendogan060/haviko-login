@@ -17,6 +17,34 @@ const INITIAL_AUTH_MODE =
     ? "register"
     : "login";
 
+// Prefill data when arriving via a "Restaurant beanspruchen" link from the
+// Gastportal map. The user still has to click through each registration
+// step themselves - this only fills the fields, it never skips ahead.
+const CLAIM_PARAMS = (() => {
+  const params = new URLSearchParams(window.location.search);
+  const placeId = params.get("claimPlaceId");
+  if (!placeId) return null;
+  return {
+    placeId,
+    name: params.get("claimName") || "",
+    address: params.get("claimAddress") || "",
+    phone: params.get("claimPhone") || ""
+  };
+})();
+
+function prefillClaimFields() {
+  if (!CLAIM_PARAMS) return;
+  if (CLAIM_PARAMS.name && $("register-name") && !$("register-name").value) {
+    $("register-name").value = CLAIM_PARAMS.name;
+  }
+  if (CLAIM_PARAMS.phone && $("register-phone") && !$("register-phone").value) {
+    $("register-phone").value = CLAIM_PARAMS.phone;
+  }
+  if (CLAIM_PARAMS.address && $("register-address") && !$("register-address").value) {
+    $("register-address").value = CLAIM_PARAMS.address;
+  }
+}
+
 const $ = (id) => document.getElementById(id);
 const app = {
   session: null,
@@ -3627,6 +3655,17 @@ async function register(event) {
     const session = Array.isArray(rows) ? rows[0] : rows;
     if (!session?.restaurant_id) throw new Error("Restaurant konnte nicht erstellt werden.");
     await initializeRestaurantState(session, setup);
+    if (CLAIM_PARAMS?.placeId) {
+      try {
+        await rpc("claim_discovered_place", {
+          p_restaurant_id: session.restaurant_id,
+          p_place_id: CLAIM_PARAMS.placeId
+        });
+      } catch {
+        // Registration itself already succeeded - a failed claim link-up
+        // just means manual review has to match it up by hand later.
+      }
+    }
     let emailVerificationSent = false;
     try {
       await requestOwnerEmailVerification(setup.email, session.restaurant_id);
@@ -3807,6 +3846,7 @@ function updateOnlineStatus() {
 async function start() {
   if (app.isLoggingOut) return;
   switchAuth(INITIAL_AUTH_MODE);
+  prefillClaimFields();
   try {
     const stored = readStoredSession();
     if (!stored?.access_token && !stored?.refresh_token) {
