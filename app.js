@@ -1253,6 +1253,15 @@ function friendlyError(error) {
   if (message.includes("PGRST202") || message.toLowerCase().includes("could not find the function")) {
     return "Ein technisches Problem ist aufgetreten. Bitte versuche es in ein paar Minuten erneut oder wende dich an den Support.";
   }
+  // Anything else (including raw JS/TypeErrors like "null is not an object")
+  // is a bug, not something a user should see verbatim - log it for
+  // debugging and show a generic, friendly message instead.
+  const looksLikeRawTechnicalError =
+    /is not an object|undefined is not a function|cannot read propert|failed to execute|unexpected token/i.test(message);
+  if (looksLikeRawTechnicalError) {
+    console.error("Unerwarteter Fehler:", error);
+    return "Etwas ist schiefgelaufen. Bitte lade die Seite neu und versuche es erneut. Falls es weiterhin nicht klappt, wende dich an den Haviko-Support.";
+  }
   return message;
 }
 
