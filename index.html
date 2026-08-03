@@ -174,22 +174,30 @@
       </div>
 
       <form id="login-form">
-        <label class="field">
-          <span>Restaurantkennung</span>
-          <input id="login-code" autocomplete="organization" placeholder="z. B. SERV-ABCD" required>
-        </label>
-        <label class="field">
-          <span>Name</span>
-          <input id="login-username" autocomplete="username" required>
-        </label>
-        <label class="field">
-          <span>Passwort</span>
-          <input id="login-password" type="password" autocomplete="current-password" minlength="6" required>
-        </label>
-        <p class="field-hint">Geräte- und Druckerzugänge werden ausschließlich in der Haviko-App verwendet.</p>
-        <p class="form-error hidden" id="login-error" role="alert"></p>
-        <button class="primary full" id="login-submit" type="submit">Anmelden</button>
-        <button class="quiet full" type="button" id="forgot-password-link">Passwort vergessen?</button>
+        <div id="login-step-1">
+          <label class="field">
+            <span>Restaurantkennung</span>
+            <input id="login-code" autocomplete="organization" placeholder="z. B. SERV-ABCD" required>
+          </label>
+          <label class="field">
+            <span>Name</span>
+            <input id="login-username" autocomplete="username" required>
+          </label>
+          <p class="form-error hidden" id="login-step-1-error" role="alert"></p>
+          <button class="primary full" id="login-continue-button" type="button">Weiter</button>
+        </div>
+
+        <div class="hidden" id="login-step-2">
+          <label class="field">
+            <span>Passwort</span>
+            <input id="login-password" type="password" autocomplete="current-password" minlength="6">
+          </label>
+          <p class="field-hint">Geräte- und Druckerzugänge werden ausschließlich in der Haviko-App verwendet.</p>
+          <p class="form-error hidden" id="login-error" role="alert"></p>
+          <button class="primary full" id="login-submit" type="submit">Anmelden</button>
+          <button class="quiet full" type="button" id="login-back-button">Zurück</button>
+          <button class="quiet full" type="button" id="forgot-password-link">Passwort vergessen?</button>
+        </div>
       </form>
 
       <form class="hidden" id="register-form" novalidate>

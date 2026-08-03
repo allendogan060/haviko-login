@@ -3479,11 +3479,61 @@ function handleModalClick(event) {
   }
 }
 
+function showLoginStep1() {
+  $("login-step-2").classList.add("hidden");
+  $("login-step-1").classList.remove("hidden");
+  $("login-error").classList.add("hidden");
+  $("login-password").value = "";
+  $("login-code").focus();
+}
+
+function showLoginStep2() {
+  $("login-step-1").classList.add("hidden");
+  $("login-step-2").classList.remove("hidden");
+  $("login-password").focus();
+}
+
+async function continueLoginStep1() {
+  const button = $("login-continue-button");
+  const error = $("login-step-1-error");
+  error.classList.add("hidden");
+  const restaurantCode = $("login-code").value.trim().toUpperCase();
+  const username = $("login-username").value.trim();
+  if (!restaurantCode || !username) {
+    error.textContent = "Bitte Restaurantkennung und Name eingeben.";
+    error.classList.remove("hidden");
+    return;
+  }
+  button.disabled = true;
+  button.textContent = "Wird geprüft …";
+  try {
+    await ensureSession();
+    const requirementRows = await rpc("get_team_member_login_requirement", {
+      p_restaurant_code: restaurantCode,
+      p_username: username
+    });
+    const requirement = Array.isArray(requirementRows) ? requirementRows[0] : requirementRows;
+    if (!requirement) throw new Error("Invalid restaurant credentials");
+    showLoginStep2();
+  } catch (caught) {
+    error.textContent = friendlyError(caught);
+    error.classList.remove("hidden");
+  } finally {
+    button.disabled = false;
+    button.textContent = "Weiter";
+  }
+}
+
 async function login(event) {
   event.preventDefault();
   const button = $("login-submit");
   const error = $("login-error");
   error.classList.add("hidden");
+  if (!$("login-password").value) {
+    error.textContent = "Bitte gib dein Passwort ein.";
+    error.classList.remove("hidden");
+    return;
+  }
   button.disabled = true;
   button.textContent = "Anmeldung läuft …";
   try {
@@ -3734,6 +3784,7 @@ function switchAuth(mode) {
   if (!loginMode && document.querySelector(".register-step:not(.hidden)")?.dataset.registerStep === "done") {
     resetRegisterWizard();
   }
+  if (loginMode) showLoginStep1();
 }
 
 async function submitGate(event) {
@@ -3781,6 +3832,20 @@ document.addEventListener("click", (event) => {
 $("view").addEventListener("click", handleViewClick);
 $("modal-shell").addEventListener("click", handleModalClick);
 $("login-form").addEventListener("submit", login);
+$("login-continue-button").addEventListener("click", continueLoginStep1);
+$("login-back-button").addEventListener("click", showLoginStep1);
+$("login-code").addEventListener("keydown", (event) => {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    continueLoginStep1();
+  }
+});
+$("login-username").addEventListener("keydown", (event) => {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    continueLoginStep1();
+  }
+});
 $("register-form").addEventListener("submit", register);
 $("login-tab").addEventListener("click", () => switchAuth("login"));
 $("register-tab").addEventListener("click", () => switchAuth("register"));
