@@ -2054,7 +2054,7 @@ function renderSettings() {
   const cashDay = activeCashDay();
   $("view").innerHTML = `
     <div class="page-tools"><div><h2>Einstellungen</h2><p>Restaurant, Online-Buchung und Kassenvorbereitung.</p></div></div>
-    <div class="split-layout">
+    <div class="settings-layout">
       <section class="section">
         <header class="section-header"><h2>Restaurant</h2></header>
         <div class="section-body">
@@ -3886,6 +3886,7 @@ $("login-2fa-code").addEventListener("keydown", (event) => {
 $("forgot-password-form").addEventListener("submit", submitForgotPassword);
 $("reset-password-form").addEventListener("submit", submitPasswordReset);
 $("logout-button").addEventListener("click", logout);
+$("sidebar-profile-button")?.addEventListener("click", () => navigate("settings"));
 $("restaurant-button").addEventListener("click", openAccountMenu);
 $("refresh-button").addEventListener("click", () => loadWorkspace(app.workspace.restaurantId));
 $("gate-form").addEventListener("submit", submitGate);
