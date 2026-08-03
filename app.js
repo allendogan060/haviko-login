@@ -854,6 +854,7 @@ async function confirmLogin2FA() {
     }
     hideLogin2FAShell();
     await loadWorkspace(pending.session.restaurant_id);
+    redirectToDashboardIfOnLoginHost();
     const isDeviceAccess = app.data.devices.some(
       (device) =>
         String(device.loginName || device.name).localeCompare(
@@ -1092,12 +1093,12 @@ async function loadWorkspace(restaurantID = null) {
   app.data = normalizeState(result.state);
   app.updatedAt = result.updatedAt;
   saveLastRestaurant(result.restaurantId);
-  if (IS_LOGIN_HOST) {
-    window.location.replace(DASHBOARD_URL);
-    return;
-  }
   showWorkspace();
   setSyncState("ready", "Aktuell");
+}
+
+function redirectToDashboardIfOnLoginHost() {
+  if (IS_LOGIN_HOST) window.location.replace(DASHBOARD_URL);
 }
 
 async function checkSessionStillValid() {
@@ -3571,6 +3572,7 @@ async function login(event) {
     }
 
     await loadWorkspace(session.restaurant_id);
+    redirectToDashboardIfOnLoginHost();
     const isDeviceAccess = app.data.devices.some(
       (device) =>
         String(device.loginName || device.name).localeCompare(
@@ -3815,6 +3817,7 @@ async function start() {
     app.session = stored;
     await ensureSession();
     await loadWorkspace(readLastRestaurant());
+    redirectToDashboardIfOnLoginHost();
   } catch {
     clearSession();
     if (IS_DASHBOARD_HOST) window.location.replace(LOGIN_URL);
