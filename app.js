@@ -968,6 +968,57 @@ async function submitForgotPassword(event) {
   }
 }
 
+async function requestKennungReminder(email) {
+  const response = await fetch(`${SUPABASE_URL}/functions/v1/owner-kennung-reminder`, {
+    method: "POST",
+    headers: {
+      apikey: SUPABASE_KEY,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ email })
+  });
+  return parseResponse(response);
+}
+
+function showForgotCodeShell() {
+  $("forgot-code-error").classList.add("hidden");
+  $("forgot-code-success").classList.add("hidden");
+  $("forgot-code-email").value = "";
+  $("forgot-code-form").classList.remove("hidden");
+  $("forgot-code-shell").classList.remove("hidden");
+  $("forgot-code-email").focus();
+}
+
+function hideForgotCodeShell() {
+  $("forgot-code-shell").classList.add("hidden");
+}
+
+async function submitForgotCode(event) {
+  event.preventDefault();
+  const button = $("forgot-code-submit");
+  const error = $("forgot-code-error");
+  error.classList.add("hidden");
+  const email = $("forgot-code-email").value.trim();
+  if (!email || !$("forgot-code-email").checkValidity()) {
+    error.textContent = "Bitte gib eine gültige E-Mail-Adresse ein.";
+    error.classList.remove("hidden");
+    return;
+  }
+  button.disabled = true;
+  button.textContent = "Wird gesendet …";
+  try {
+    await requestKennungReminder(email);
+    $("forgot-code-form").classList.add("hidden");
+    $("forgot-code-success").classList.remove("hidden");
+  } catch (caught) {
+    error.textContent = friendlyError(caught);
+    error.classList.remove("hidden");
+  } finally {
+    button.disabled = false;
+    button.textContent = "Kennung anfordern";
+  }
+}
+
 async function handlePasswordResetRedirect() {
   const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
   const type = hashParams.get("type");
@@ -4012,6 +4063,9 @@ $("verify-logout-button").addEventListener("click", () => {
 });
 $("forgot-password-link").addEventListener("click", showForgotPasswordShell);
 $("forgot-password-close").addEventListener("click", hideForgotPasswordShell);
+$("forgot-code-link").addEventListener("click", showForgotCodeShell);
+$("forgot-code-close").addEventListener("click", hideForgotCodeShell);
+$("forgot-code-form").addEventListener("submit", submitForgotCode);
 $("login-2fa-confirm-button").addEventListener("click", confirmLogin2FA);
 $("login-2fa-resend-button").addEventListener("click", resendLogin2FACode);
 $("login-2fa-cancel-button").addEventListener("click", cancelLogin2FA);

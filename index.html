@@ -103,6 +103,24 @@
     </div>
   </section>
 
+  <section class="verify-shell hidden" id="forgot-code-shell" aria-label="Kennung vergessen" aria-live="polite">
+    <img class="empty-mark" src="./assets/haviko-app-icon.png" alt="">
+    <h1>Kennung vergessen?</h1>
+    <p>Gib die E-Mail-Adresse ein, die mit deinem Restaurant-Konto verbunden ist. Falls ein Konto existiert, senden wir deine Restaurantkennung und deinen Mitarbeiternamen per E-Mail.</p>
+    <form id="forgot-code-form">
+      <label class="field">
+        <span>E-Mail-Adresse</span>
+        <input id="forgot-code-email" type="email" autocomplete="email" required>
+      </label>
+      <p class="form-error hidden" id="forgot-code-error" role="alert"></p>
+      <p class="field-hint hidden" id="forgot-code-success">Falls ein Konto mit dieser E-Mail-Adresse existiert, wurde eine E-Mail versendet.</p>
+      <div class="verify-actions">
+        <button class="primary full" id="forgot-code-submit" type="submit">Kennung anfordern</button>
+        <button class="quiet full" type="button" id="forgot-code-close">Zurück zur Anmeldung</button>
+      </div>
+    </form>
+  </section>
+
   <section class="verify-shell hidden" id="login-2fa-shell" aria-label="Anmeldecode bestätigen" aria-live="polite">
     <img class="empty-mark" src="./assets/haviko-app-icon.png" alt="">
     <h1>Anmeldecode</h1>
@@ -188,6 +206,7 @@
             <span>Restaurantkennung</span>
             <input id="login-code" autocomplete="organization" placeholder="z. B. SERV-ABCD" required>
           </label>
+          <button class="quiet" type="button" id="forgot-code-link" style="margin:-10px 0 12px;">Kennung vergessen?</button>
           <label class="field">
             <span>Name</span>
             <input id="login-username" autocomplete="username" required>
@@ -452,6 +471,6 @@
     </div>
   </template>
 
-  <script type="module" src="./app.js?v=9"></script>
+  <script type="module" src="./app.js?v=10"></script>
 </body>
 </html>
