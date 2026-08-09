@@ -750,16 +750,16 @@ input:focus, select:focus, textarea:focus { border-color: var(--action); box-sha
   width: min(100% - 32px, 480px);
   height: max-content;
   margin: auto;
-  padding: 26px 34px;
+  padding: 20px 34px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--surface);
   box-shadow: 0 0 0 100vmax rgba(8, 55, 45, 0.55);
 }
-.verify-shell .empty-mark { margin: 0 auto 14px; }
-.verify-shell h1 { margin: 0 0 8px; font-size: 24px; text-align: center; }
-.verify-shell p { margin: 0 0 6px; color: var(--muted); line-height: 1.5; text-align: center; }
-.verify-actions { display: grid; gap: 10px; margin-top: 20px; }
+.verify-shell .empty-mark { width: 36px; height: 36px; margin: 0 auto 10px; }
+.verify-shell h1 { margin: 0 0 6px; font-size: 22px; text-align: center; }
+.verify-shell p { margin: 0 0 4px; color: var(--muted); line-height: 1.4; text-align: center; }
+.verify-actions { display: grid; gap: 8px; margin-top: 14px; }
 
 @media (max-width: 760px) {
   .step-indicator span:last-child { display: none; }

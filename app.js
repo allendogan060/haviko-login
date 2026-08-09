@@ -1177,16 +1177,19 @@ function startResendCooldown(seconds = 30) {
 
 async function resendEmailVerification() {
   const pending = app.pendingVerification;
-  if (!pending?.email) return;
+  if (!pending?.restaurantID) return;
   const button = $("verify-resend-button");
   const error = $("verify-error");
   error.classList.add("hidden");
   button.disabled = true;
   button.textContent = "Wird gesendet …";
   try {
-    await requestOwnerEmailVerification(pending.email, pending.restaurantID);
+    const sendResult = await requestOwnerEmailVerification(pending.email || null, pending.restaurantID);
+    const recipientEmail = sendResult?.recipientEmail || pending.email;
+    app.pendingVerification = { ...pending, email: recipientEmail };
+    $("verify-email").textContent = recipientEmail || "–";
     $("verify-code").value = "";
-    $("verify-message").textContent = `Wir haben einen neuen Code an ${pending.email} gesendet.`;
+    $("verify-message").textContent = `Wir haben einen neuen Code an ${recipientEmail || "deine Recovery-E-Mail"} gesendet.`;
     startResendCooldown();
   } catch (caught) {
     error.textContent = friendlyError(caught);
@@ -3675,12 +3678,28 @@ async function login(event) {
     }
 
     try {
-      const claimStatus = await rpc("get_restaurant_claim_status", { p_restaurant_id: session.restaurant_id });
-      if (claimStatus === "pending") {
+      const accessStatus = await rpc("get_restaurant_access_status", { p_restaurant_id: session.restaurant_id });
+      if (accessStatus === "email_unverified") {
+        let sentEmail = "";
+        let sendFailed = false;
+        try {
+          const sendResult = await requestOwnerEmailVerification(null, session.restaurant_id);
+          sentEmail = sendResult?.recipientEmail || "";
+        } catch {
+          sendFailed = true;
+        }
+        showEmailVerificationGate({
+          restaurantID: session.restaurant_id,
+          email: sentEmail,
+          sendFailed
+        });
+        return;
+      }
+      if (accessStatus === "pending_review") {
         $("pending-review-shell").classList.remove("hidden");
         return;
       }
-      if (claimStatus === "rejected") {
+      if (accessStatus === "rejected") {
         throw new Error("Dieses Restaurant konnte nicht freigeschaltet werden. Bitte kontaktiere den Haviko-Support.");
       }
     } catch (statusError) {
