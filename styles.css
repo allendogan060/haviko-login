@@ -747,10 +747,10 @@ input:focus, select:focus, textarea:focus { border-color: var(--action); box-sha
   inset: 0;
   z-index: 95;
   display: grid;
-  width: min(100% - 32px, 440px);
+  width: min(100% - 32px, 600px);
   height: max-content;
   margin: auto;
-  padding: 30px;
+  padding: 34px 44px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--surface);
