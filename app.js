@@ -1211,7 +1211,13 @@ async function loadWorkspace(restaurantID = null) {
   app.data = normalizeState(result.state);
   app.updatedAt = result.updatedAt;
   saveLastRestaurant(result.restaurantId);
-  showWorkspace();
+  // On login.haviko.de this data is only needed to validate the login and
+  // decide where to send the browser next - actually rendering the
+  // dashboard shell here, right before redirectToDashboardIfOnLoginHost()
+  // navigates away, made the real dashboard.haviko.de flash on screen for
+  // an instant and then get replaced by dashboard.haviko.de re-rendering
+  // the same thing from scratch, which read as constant flicker.
+  if (!IS_LOGIN_HOST) showWorkspace();
   setSyncState("ready", "Aktuell");
 }
 
